@@ -1,3 +1,22 @@
+# Secrets
 .env
-data/
+
+# Data (1.4GB+ of cached API responses, downloaded CSVs, derived parquet).
+# Leading slash matters: a bare `data/` would also swallow src/data/.
+/data/
+# (v1/data is a committed relative symlink -> ../data, so v1 scripts still
+#  resolve Path(__file__).parent.parent/"data" after the move into v1/.)
+
+# Trained model checkpoints (same anchoring reason — src/models/ is source)
+/models/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# macOS
 .DS_Store
