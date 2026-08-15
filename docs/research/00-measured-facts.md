@@ -172,6 +172,42 @@ The full closing suite from 2019/20 adds per-book closing 1X2 (`B365C*`), `MaxC*
 
 **Collection timing caveat**: per <https://www.football-data.co.uk/matches.php>, "pre-close" odds are snapshotted Friday ≤17:00 BST for weekend fixtures and Tuesday ≤13:00 for midweek. So the pre-close price is a genuine 1–3 day-out price — not an opening price, and not a last-second one.
 
+### ⚠️ Pinnacle closing odds stop partway through 2025/26
+
+Measured from the built corpus (233,687 main-division matches), counting non-null `PSCH` by month for season 2025-26:
+
+| Month | matches | Pinnacle close | Bet365 close | Avg close |
+|---|---|---|---|---|
+| 2025-07 | 8 | 8 | 8 | 8 |
+| 2025-08 | 744 | 744 | 744 | 744 |
+| 2025-09 | 713 | 713 | 713 | 713 |
+| 2025-10 | 709 | **668** | 709 | 709 |
+| 2025-11 | 793 | **307** | 793 | 793 |
+| 2025-12 | 762 | **365** | 762 | 762 |
+| 2026-01 | 822 | **159** | 822 | 822 |
+| 2026-02 | 880 | **0** | 880 | 880 |
+| 2026-03 | 820 | **0** | 820 | 820 |
+| 2026-04 | 868 | **0** | 868 | 868 |
+| 2026-05 | 527 | **0** | 527 | 527 |
+
+**Pinnacle closing coverage degrades from October 2025 and stops entirely from February 2026.** Bet365 closing and market-average closing remain complete throughout.
+
+A search summary had claimed the Pinnacle feed became unreliable "since 2025-07-23" and was excluded from Max/Avg. The direction is right and the date is wrong — August and September 2025 are complete, and the decay starts in October.
+
+**Consequence for the backtest, and it is load-bearing:** the truth test is "de-vigged Pinnacle closing", and **2025/26 cannot supply it.** Either end the locked holdout at 2024/25, or evaluate 2025/26 against Bet365/Avg closing and label that column honestly as a softer benchmark. Do not quietly fall back to `AvgC` and keep calling it the closing line.
+
+Across the whole corpus (main + extra) **160,868 matches carry Pinnacle closing odds** — more than the 109k estimated from main divisions alone, because the extra-country files carry `PSCH` too.
+
+### football-data serves a SUBSTITUTE file for a division-season that does not exist
+
+Not documented anywhere, and it silently triples match counts if you trust filenames.
+
+Requesting `mmz4281/9394/P1.csv`, `.../SC1.csv`, `.../SP2.csv` and `.../SP1.csv` returns **four byte-identical files**, all containing Spanish La Liga 1993/94 with `Div=SP1`. Same for 2026/27, where `E0.csv`, `E3.csv` and `EC.csv` all return the same National League rows with `Div=EC`. This is the same server behaviour that produces the HTTP 300 "Multiple Choices" responses.
+
+**Two defences, both required:** trust the file's own `Div` column over the filename, and deduplicate on `(div, date, home, away)`. Together these collapsed 3,278 rows into 1,253 real matches. Verified that nothing real is lost — the substituted division-seasons genuinely do not exist upstream.
+
+**One check that looked like a bug and was not:** 554 matches carry a season label disagreeing with a July–June season boundary. All 554 are the COVID-delayed 2019/20 season running into July and August 2020. The data is right; the heuristic was wrong.
+
 **Provenance caveat**: `notes.txt` names Betbrain, Oddsportal and individual bookmakers as sources. `Max`/`Avg` are aggregator-derived, so "market max" is a price *someone somewhere showed*, not necessarily one that could have been taken in size.
 
 ### The overlap that makes the two-tier design work
