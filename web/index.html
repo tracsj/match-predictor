@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Match Predictor Lab</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+    <header class="hero">
+      <div class="hero-text">
+        <p class="eyebrow">Prediction Studio</p>
+        <h1>Match Predictor Lab</h1>
+        <p class="subhead">
+          Navigate leagues and gameweeks, review predicted scorelines, odds, and bet
+          recommendations. Designed for fast triage of betting opportunities.
+        </p>
+      </div>
+      <div class="hero-panel">
+        <div class="stat">
+          <span>Data Snapshot</span>
+          <strong id="generatedAt">--</strong>
+        </div>
+        <div class="stat">
+          <span>Bookmaker</span>
+          <strong id="bookmakerId">--</strong>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="controls">
+        <div class="control">
+          <label>League</label>
+          <select id="leagueSelect"></select>
+        </div>
+        <div class="control">
+          <label>Season</label>
+          <select id="seasonSelect"></select>
+        </div>
+        <div class="control">
+          <label>Gameweek</label>
+          <select id="roundSelect"></select>
+        </div>
+        <div class="control">
+          <label>Min Confidence</label>
+          <input id="confidenceInput" type="number" min="0" max="1" step="0.01" value="0.45" />
+        </div>
+        <div class="control">
+          <label>Odds Min</label>
+          <input id="oddsMinInput" type="number" min="0" step="0.01" value="1.01" />
+        </div>
+        <div class="control">
+          <label>Odds Max</label>
+          <input id="oddsMaxInput" type="number" min="1" step="0.01" value="100.00" />
+        </div>
+        <div class="control toggle">
+          <label>
+            <input id="sparklineToggle" type="checkbox" />
+            Show ROI sparkline
+          </label>
+        </div>
+        <div class="control toggle">
+          <label>
+            <input id="lineupToggle" type="checkbox" />
+            Show lineups
+          </label>
+        </div>
+      </section>
+
+      <section class="summary">
+        <div class="summary-card">
+          <h3>Round ROI</h3>
+          <p id="roiSummary">--</p>
+        </div>
+        <div class="summary-card">
+          <h3>Bet Count</h3>
+          <p id="betCount">--</p>
+        </div>
+        <div class="summary-card">
+          <h3>Hit Rate</h3>
+          <p id="hitRate">--</p>
+        </div>
+        <div class="summary-card">
+          <h3>Odds Window</h3>
+          <p id="oddsWindow">--</p>
+        </div>
+        <div class="summary-card" id="bundleNotice" hidden>
+          <h3>Bundle Scope</h3>
+          <p id="bundleScope">--</p>
+        </div>
+      </section>
+
+      <section class="season-panel">
+        <div class="season-header">
+          <div>
+            <h2>Season ROI Timeline</h2>
+            <p class="muted">Cumulative profit if you bet each week using the current confidence threshold.</p>
+          </div>
+          <div class="season-stats">
+            <div>
+              <span>Cumulative Profit</span>
+              <strong id="seasonProfit">--</strong>
+            </div>
+            <div>
+              <span>Cumulative ROI</span>
+              <strong id="seasonRoi">--</strong>
+            </div>
+            <div>
+              <span>Max Drawdown</span>
+              <strong id="seasonDrawdown">--</strong>
+            </div>
+          </div>
+        </div>
+        <div id="seasonSparkline" class="sparkline"></div>
+        <div class="season-actions">
+          <button id="resetFilters" type="button">Reset filters</button>
+        </div>
+        <div id="seasonTable" class="season-table"></div>
+      </section>
+
+      <section id="fixtures" class="fixtures"></section>
+    </main>
+
+    <footer>
+      <p>Local demo. Uses historical lineups and odds where available.</p>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
