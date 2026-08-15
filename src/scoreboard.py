@@ -23,8 +23,10 @@ import pandas as pd
 
 from src.data.footballdata import OUT_DIR
 from src.eval.betting import (
-    B365_CLOSE, MARKET_MAX_CLOSE, PINNACLE_CLOSE, BetRule, bootstrap_ci,
-    random_bet_null, required_sample_size, simulate, summarize,
+    B365_CLOSE, MARKET_AVG_PRE, MARKET_MAX_CLOSE, MARKET_MAX_PRE,
+    PINNACLE_CLOSE, PINNACLE_PRE, BetRule, bootstrap_ci, clv_report,
+    closing_price_for_bets, random_bet_null, required_sample_size, simulate,
+    summarize,
 )
 from src.eval.devig import devig, overround
 from src.eval.metrics import OUTCOMES, summary
@@ -101,7 +103,28 @@ def main() -> None:
     print("=" * 78)
     print("FORECAST QUALITY   (lower is better for rps / log_loss / brier / ece)")
     print("=" * 78)
-    rows = [summary(p, y, label=name) for name, p in reference_models(panel).items()]
+    print("  Walk-forward. Anything that needs fitting is fitted on prior")
+    print("  seasons only, then scored on the held-out season. The market rows")
+    print("  need no fitting, so they are unaffected -- but they are scored on")
+    print("  the same held-out rows, so every row here is comparable.")
+    print()
+
+    splits = list(season_walk_forward(panel, min_train_seasons=3))
+    for s in splits:
+        assert_no_leakage(panel, s)
+
+    oos: dict[str, list[np.ndarray]] = {}
+    oos_y: list[np.ndarray] = []
+    for s in splits:
+        mask = np.zeros(len(panel), dtype=bool)
+        mask[s.train_idx] = True
+        models = reference_models(panel, train_mask=mask)
+        for name, p in models.items():
+            oos.setdefault(name, []).append(p[s.test_idx])
+        oos_y.append(panel["result"].to_numpy()[s.test_idx])
+
+    y_oos = np.concatenate(oos_y)
+    rows = [summary(np.vstack(v), y_oos, label=k) for k, v in oos.items()]
     print(_fmt(pd.DataFrame(rows)))
     print()
     print("  Published anchors: market RPS 0.1905 over 19 Serie A seasons")
@@ -113,10 +136,8 @@ def main() -> None:
     print("=" * 78)
     print("WALK-FORWARD SPLITS   (train on all prior seasons, test on one)")
     print("=" * 78)
-    splits = list(season_walk_forward(panel, min_train_seasons=3))
-    for s in splits:
-        assert_no_leakage(panel, s)
-    print(f"  {len(splits)} splits, all pass assert_no_leakage")
+    print(f"  {len(splits)} splits, all pass assert_no_leakage; "
+          f"{len(y_oos):,} out-of-sample matches scored above")
     srows = [{"test_season": s.label, "train_n": len(s.train_idx),
               "test_n": len(s.test_idx), "train_ends": s.train_end.date(),
               "test_starts": s.test_start.date()} for s in splits]
@@ -181,6 +202,40 @@ def main() -> None:
         print("  you could have taken, in size, at that moment. No commission")
         print("  is modelled. 3 price sets were tried, which is the")
         print("  multiple-comparisons disclosure.")
+
+    print()
+    print("-" * 78)
+    print("  CLOSING-LINE VALUE   (the headline metric -- report before ROI)")
+    print("-" * 78)
+    print("  Bet at a PRE-close price, grade against the Pinnacle close.")
+    print("  Ratio > 1 means you took a bigger price than the market settled")
+    print("  at. Betting and grading at the same price makes this identically")
+    print("  1.0, which is why the pre-close columns exist.")
+    print()
+    clv_panel = panel[panel[PINNACLE_PRE.cols + MARKET_MAX_PRE.cols]
+                      .notna().all(axis=1)].reset_index(drop=True)
+    if len(clv_panel):
+        sharp = devig(clv_panel[PINNACLE_PRE.cols].to_numpy(float), method="shin")
+        all_in = BetRule(min_ev=-1.0, min_odds=1.0, max_odds=1e6, name="every match")
+        crows = []
+        for ps in (PINNACLE_PRE, MARKET_AVG_PRE, MARKET_MAX_PRE):
+            if not all(c in clv_panel.columns for c in ps.cols):
+                continue
+            b = simulate(clv_panel, sharp, ps, all_in)
+            if b.empty:
+                continue
+            r = clv_report(b, closing_price_for_bets(b, clv_panel))
+            crows.append({"taken_at": ps.label, "n": r["n"],
+                          "mean_ratio": r["mean_ratio"],
+                          "median_ratio": r["median_ratio"],
+                          "pct_shortened": r["pct_shortened"],
+                          "binom_p": r["binom_pvalue"]})
+        if crows:
+            print(_fmt(pd.DataFrame(crows)))
+            print()
+            print("  Pinnacle pre-close against Pinnacle close is the null: no")
+            print("  selection skill, only drift between Friday and kickoff, so")
+            print("  it should sit at ~1.0. Anything above it is price shopping.")
 
     print()
     null = random_bet_null(panel, PINNACLE_CLOSE, n_bets=2000, n_sims=500, seed=0)

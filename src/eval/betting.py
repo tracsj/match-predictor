@@ -37,6 +37,8 @@ __all__ = [
     "PriceSet", "BetRule", "simulate", "summarize", "clv_report",
     "bootstrap_ci", "random_bet_null", "required_sample_size",
     "PINNACLE_CLOSE", "B365_CLOSE", "MARKET_MAX_CLOSE", "DEFAULT_PRICES",
+    "PINNACLE_PRE", "B365_PRE", "MARKET_MAX_PRE", "MARKET_AVG_PRE",
+    "closing_price_for_bets", "CLOSE_FOR",
 ]
 
 
@@ -59,13 +61,47 @@ class PriceSet:
         return [self.home, self.draw, self.away]
 
 
-# The standard three for this project. Pinnacle closing is the truth test;
-# Bet365 closing is a book you could actually hold an account with; market
-# maximum is the optimistic bound.
+# Closing prices. Pinnacle closing is the truth test; Bet365 closing is a book
+# you could actually hold an account with; market maximum is the optimistic
+# bound.
 PINNACLE_CLOSE = PriceSet("pinnacle_close", "psch", "pscd", "psca", sharp=True)
 B365_CLOSE = PriceSet("b365_close", "b365ch", "b365cd", "b365ca")
 MARKET_MAX_CLOSE = PriceSet("market_max_close", "maxch", "maxcd", "maxca")
 DEFAULT_PRICES = (PINNACLE_CLOSE, B365_CLOSE, MARKET_MAX_CLOSE)
+
+# Pre-close prices, snapshotted Friday <=17:00 BST for weekend fixtures and
+# Tuesday <=13:00 for midweek. These are what you would actually have BET at;
+# the closing set above is what you GRADE closing-line value against.
+#
+# Betting and grading at the same closing price makes CLV tautologically 1.0,
+# so an honest simulation takes a pre-close price here and measures it against
+# the close. Available from ~2005/06 for Bet365 and ~2012/13 for Pinnacle.
+PINNACLE_PRE = PriceSet("pinnacle_pre", "psh", "psd", "psa", sharp=True)
+B365_PRE = PriceSet("b365_pre", "b365h", "b365d", "b365a")
+MARKET_MAX_PRE = PriceSet("market_max_pre", "maxh", "maxd", "maxa")
+MARKET_AVG_PRE = PriceSet("market_avg_pre", "avgh", "avgd", "avga")
+
+# Which closing column grades which selection, for CLV.
+CLOSE_FOR = {"H": "psch", "D": "pscd", "A": "psca"}
+
+
+def closing_price_for_bets(bets: pd.DataFrame, df: pd.DataFrame,
+                           close_map: dict[str, str] | None = None) -> pd.Series:
+    """The closing price of the exact selection each bet was placed on.
+
+    CLV needs the close for the side you actually backed, not the row's
+    favourite. Getting this wrong is v1's home/away bug wearing a different
+    hat, so the lookup is explicit rather than positional.
+    """
+    close_map = close_map or CLOSE_FOR
+    idx = df.set_index("match_id") if "match_id" in df.columns else df
+    out = []
+    for mid, sel in zip(bets["match_id"], bets["selection"]):
+        try:
+            out.append(float(idx.loc[mid, close_map[sel]]))
+        except (KeyError, TypeError, ValueError):
+            out.append(np.nan)
+    return pd.Series(out, index=bets.index, dtype=float)
 
 
 @dataclass(frozen=True)
