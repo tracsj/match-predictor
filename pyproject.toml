@@ -1,0 +1,40 @@
+[project]
+name = "match-predictor"
+version = "0.2.0"
+description = "Neural pre-match football outcome prediction, evaluated honestly against closing odds"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    # Core numerics / data
+    "numpy>=2.0",
+    "pandas>=2.2",
+    "pyarrow>=17.0",          # parquet
+    "scipy>=1.14",            # Shin de-vig solver, bootstrap, distributions
+
+    # Models
+    "torch>=2.5",             # the network
+    "scikit-learn>=1.5",      # calibration, metrics, baseline utilities
+    # GBM reference on the scoreboard. CatBoost specifically: Yeung et al. 2024
+    # found CatBoost + pi-ratings the best model on goals-only football data
+    # (RPS 0.2085), so it is the number the net has to beat. LightGBM was tried
+    # and dropped -- its wheel needs Homebrew libomp, and it adds nothing here.
+    "catboost>=1.2",
+    "penaltyblog>=1.0",       # Dixon-Coles / bivariate Poisson baselines
+
+    # Ingest
+    "requests>=2.32",
+
+    # Plots (reliability diagrams, equity curves)
+    "matplotlib>=3.9",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.7",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

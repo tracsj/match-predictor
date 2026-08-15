@@ -1,0 +1,192 @@
+# Measured facts: data availability
+
+**Measured 2026-08-15. Re-check before quoting — API entitlements, vendor pricing and dataset column sets all drift.**
+
+Everything here came from an actual probe, not from documentation. The command that produced each finding is recorded alongside it, so a later session can re-run the check rather than having to trust or discard the claim.
+
+---
+
+## SportMonks v3 — what the existing key actually reaches
+
+Auth is `?api_token=` as a query parameter (not a header). The token lives in `.env` as `SPORTMONKS_API_TOKEN`.
+
+### Plan tier
+
+```bash
+set -a; . ./.env; set +a
+curl -s "https://api.sportmonks.com/v3/football/leagues?api_token=$SPORTMONKS_API_TOKEN&per_page=50"
+```
+
+Returns `HTTP 200` with a `subscription` block reading `{"plan": "Football Free Plan", "sport": "Football", "category": "Standard"}` and a `rate_limit` block showing **3,000 requests per hour**, resetting hourly, counted **per entity type** (the `requested_entity` field names which).
+
+### League entitlement — four ids, two real leagues
+
+| id | name | note |
+|---|---|---|
+| 271 | Danish Superliga | |
+| 501 | Scottish Premiership | |
+| 513 | Scottish Premiership Play-Offs | |
+| 1659 | Danish Superliga Play-offs | |
+
+`pagination.has_more` is `false`, so this is the complete list. **No top-5 European league is reachable on the free plan.**
+
+### Season entitlement — 22 seasons per league, far more than v1 used
+
+```bash
+for p in 1 2; do curl -s "https://api.sportmonks.com/v3/football/seasons?api_token=$T&per_page=50&page=$p"; done
+```
+
+59 unique seasons: 22 for league 271, 22 for 501, 13 for 513, 2 for 1659. Names span **2005/2006 → 2026/2027**. Note the paging quirk: entitlement filtering appears to happen *after* pagination, so page 1 returns 50 and page 2 returns 9 even with `per_page=50`. Do not trust a single page.
+
+**v1 pulled only 2 seasons per league** (`SPORTMONKS_SEASONS_PER_LEAGUE=2`), so the free plan was being used at roughly a tenth of its depth.
+
+### Fetching fixtures for a historical season
+
+The obvious endpoint does **not** exist:
+
+```
+GET /v3/football/fixtures/seasons/{id}   ->  {"message": "The requested endpoint does not exist"}
+```
+
+What works:
+
+```bash
+curl -s "https://api.sportmonks.com/v3/football/seasons/1937?api_token=$T&include=fixtures"
+```
+
+Returns the season object with a `fixtures` array (228 entries for Scottish Premiership 2015/16). `GET /v3/football/fixtures?filters=fixtureSeasons:{id}` also works but returns no `pagination.total`, which makes it harder to verify completeness.
+
+### Data richness by era — the boundary that matters
+
+Probed by taking the middle fixture of each season and requesting `include=participants;scores;lineups;statistics;events;odds`:
+
+| Season | lineup entries | team stats | events | odds rows |
+|---|---|---|---|---|
+| SCO 2005/06 | 0 | 0 | 0 | 0 |
+| SCO 2011/12 | 35 | 0 | 14 | 0 |
+| SCO 2015/16 | 35 | 6 | 15 | 0 |
+| SCO 2018/19 | 35 | 10 | 12 | 1,727 |
+| SCO 2022/23 | 37 | 14 | 18 | 4,488 |
+| DEN 2019/20 | 36 | 14 | 14 | 3,891 |
+
+**Odds begin at 2018/19.** But team-level `statistics` counts hide the more important boundary — per-player detail. Probed separately with `include=lineups.details`, counting distinct `type_id` values across all lineup entries:
+
+| Season | distinct player stat types | detail rows |
+|---|---|---|
+| SCO 2018/19 | **6** | 52 |
+| SCO 2019/20 | 35 | 474 |
+| SCO 2020/21 | 36 | 436 |
+| SCO 2021/22 | 35 | 441 |
+| SCO 2022/23 | 36 | 405 |
+| DEN 2019/20 | 37 | 461 |
+| DEN 2020/21 | 41 | 491 |
+| DEN 2021/22 | 40 | 522 |
+| DEN 2022/23 | 38 | 486 |
+
+**Rich per-player statistics begin at 2019/20, not 2018/19.** 2018/19 has odds but almost no player detail, so it is not usable for the player-encoder branch.
+
+⇒ **usable player-level window: 2019/20 → 2025/26, both leagues, ≈3,000 matches.**
+
+### Odds market filtering — a 40× storage difference
+
+```bash
+# all markets
+curl -s ".../odds/pre-match/fixtures/18535561?api_token=$T"              # 1,996,667 bytes
+# one market
+curl -s ".../odds/pre-match/fixtures/18535561/markets/1?api_token=$T"    #    50,300 bytes
+```
+
+Unfiltered: 4,488 odd rows spanning ~30 markets (Correct Score 618, Correct Score 1st Half 301, Goals O/U 281, Asian Handicap 236, …). Filtered to `markets/1` (Fulltime Result): **115 rows ≈ 38 bookmakers × 3 outcomes.**
+
+v1 stored everything unfiltered and read only Match Winner, which is why `data/odds/` is 1.35 GB — 96% of the repo — for information that fits in roughly 35 MB.
+
+### Upgrade pricing — read off the marketing page, NOT verified against an account
+
+From <https://www.sportmonks.com/football-api/plans-pricing/> on 2026-08-15:
+
+| Plan | Price | Leagues | Rate limit |
+|---|---|---|---|
+| Starter | €29/mo | any 5 worldwide | 2,000/hr per entity |
+| Growth | €99/mo | any 30 worldwide | 2,500/hr per entity |
+| Pro | €249/mo | any 120 worldwide | 3,000/hr per entity |
+| Enterprise | custom | all 2,200+ | 5,000/hr per entity |
+
+14-day free trial on the paid tiers; yearly billing advertised at 20% off.
+
+⚠️ **Three things are unverified and all of them matter before money moves:** whether Starter includes the same 22-season history depth the free tier grants for its leagues (the page does not say); whether the 5 leagues can be changed after selection; and whether these prices are current. The free tier grants deep history for its two leagues, so depth *probably* follows the league grant — but that is an inference. **Use the free trial to check, don't pay first.**
+
+---
+
+## football-data.co.uk — free, and the backbone of the v2 corpus
+
+No key, no login, no practical rate limit. Two URL shapes:
+
+```
+https://www.football-data.co.uk/mmz4281/{season}/{div}.csv   # e.g. 2324/E0.csv
+https://www.football-data.co.uk/new/{country}.csv            # e.g. DNK.csv
+```
+
+Column key and odds provenance: <https://www.football-data.co.uk/notes.txt>
+
+### Breadth — 22 main divisions, measured for 2023/24
+
+Downloaded all 22 and counted rows with a `Date`:
+
+| Div | Matches | | Div | Matches | | Div | Matches |
+|---|---|---|---|---|---|---|---|
+| E0 | 380 | | SC0 | 228 | | SP1 | 380 |
+| E1 | 552 | | SC1 | 180 | | SP2 | 462 |
+| E2 | 552 | | SC2 | 180 | | F1 | 306 |
+| E3 | 552 | | SC3 | 180 | | F2 | 379 |
+| EC | 552 | | D1 | 306 | | N1 | 306 |
+| I1 | 380 | | D2 | 306 | | B1 | 312 |
+| I2 | 380 | | | | | P1 | 306 |
+| | | | | | | T1 | 380 |
+| | | | | | | G1 | 240 |
+
+**Total: 7,799 matches in one season**, every division carrying `PSCH` (Pinnacle closing).
+
+### Depth — what exists when
+
+Probed `E0` across seasons for column presence:
+
+| Season | cols | shots | B365 open | Pinnacle open | Pinnacle CLOSE | full close suite | `Time` |
+|---|---|---|---|---|---|---|---|
+| 1993/94 | 8 | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| 2000/01 | 45 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| 2005/06 | 68 | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| 2010/11 | 71 | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| 2011/12 | — | ✓ | ✓ | ✓ | **✗** | ✗ | ✗ |
+| **2012/13** | — | ✓ | ✓ | ✓ | **✓** | ✗ | ✗ |
+| 2015/16 | 65 | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| **2019/20** | 106 | ✓ | ✓ | ✓ | ✓ | **✓** | **✓** |
+| 2023/24 | — | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| 2025/26 | 132 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+Two boundaries to design around:
+
+1. **Pinnacle closing odds (`PSCH`/`PSCD`/`PSCA`) start at 2012/13.** Absent in 2011/12, present every season since. ⇒ **~109,000 matches with genuine closing odds** (14 seasons × 7,799).
+2. **The `Time` column only exists from 2019/20.** Before that, same-day fixtures cannot be ordered, so any rolling feature risks same-matchday contamination. Drop the matchday from the feature window rather than pretend the ordering is known.
+
+The full closing suite from 2019/20 adds per-book closing 1X2 (`B365C*`), `MaxC*`/`AvgC*`, closing O/U 2.5, closing Asian handicap, and Betfair Exchange closing (`BFEC*`).
+
+**Collection timing caveat**: per <https://www.football-data.co.uk/matches.php>, "pre-close" odds are snapshotted Friday ≤17:00 BST for weekend fixtures and Tuesday ≤13:00 for midweek. So the pre-close price is a genuine 1–3 day-out price — not an opening price, and not a last-second one.
+
+**Provenance caveat**: `notes.txt` names Betbrain, Oddsportal and individual bookmakers as sources. `Max`/`Avg` are aggregator-derived, so "market max" is a price *someone somewhere showed*, not necessarily one that could have been taken in size.
+
+### The overlap that makes the two-tier design work
+
+Both SportMonks free-plan leagues are also here, with Pinnacle closing odds:
+
+- **Scotland** — `SC0` in the main files.
+- **Denmark** — `new/DNK.csv`: 2,968 rows, seasons 2012/13 → 2026/27, columns `Country, League, Season, Date, Time, Home, Away, HG, AG, Res, PSCH/D/A, MaxCH/D/A, AvgCH/D/A, BFECH/D/A, B365CH/D/A`.
+
+Note what the extra-league files do **not** have: no pre-close odds, no shots/corners/cards, no O/U, no Asian handicap. **Closing odds only.** So for Denmark you can measure calibration against the close, but you cannot simulate "bet at a pre-close price" the way you can for Scotland.
+
+---
+
+## Hardware
+
+Apple M5, 10 cores, 16 GB RAM, macOS 26.2. `uv` 0.11.6 present. System Python is 3.9.6; the project uses its own 3.12 venv.
+
+Compute is not a constraint for anything in this plan. A 3-layer network over 100k rows is seconds per epoch on CPU. Note that at this model size **MPS is frequently slower than CPU** because kernel-launch overhead dominates — benchmark both rather than assuming the GPU path is faster.
