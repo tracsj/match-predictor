@@ -29,6 +29,8 @@ from src.eval.betting import (
     summarize,
 )
 from src.eval.devig import devig, overround
+from src.features.ratings import add_ratings
+from src.models.baselines import CatBoostBaseline, OrderedLogit, RATING_FEATURES
 from src.eval.metrics import OUTCOMES, summary
 from src.eval.split import assert_no_leakage, season_walk_forward
 
@@ -43,6 +45,11 @@ def load_panel(first: str = "2016-17", last: str = "2024-25") -> pd.DataFrame:
     benchmark -- see docs/research/00-measured-facts.md.
     """
     df = pd.read_parquet(OUT_DIR / "matches.parquet")
+    # Ratings are built over the WHOLE corpus in chronological order, before
+    # filtering. Each row's rating still comes only from matches strictly
+    # before it, so this is not leakage -- but restricting first would throw
+    # away the history that makes the ratings meaningful.
+    df = add_ratings(df.sort_values("kickoff").reset_index(drop=True))
     df = df[(df["source"] == "main")
             & df["season"].between(first, last)
             & df[PINNACLE_CLOSE.cols].notna().all(axis=1)]
@@ -81,6 +88,8 @@ def main() -> None:
     ap.add_argument("--last-season", default="2024-25")
     ap.add_argument("--min-ev", type=float, default=0.05)
     ap.add_argument("--boot", type=int, default=2000)
+    ap.add_argument("--skip-catboost", action="store_true",
+                    help="skip the CatBoost row (it is the slowest to fit)")
     args = ap.parse_args()
 
     panel = load_panel(args.first_season, args.last_season)
@@ -113,15 +122,25 @@ def main() -> None:
     for s in splits:
         assert_no_leakage(panel, s)
 
+    X = panel[RATING_FEATURES].to_numpy(float)
+    y_all = panel["result"].to_numpy()
+
     oos: dict[str, list[np.ndarray]] = {}
     oos_y: list[np.ndarray] = []
     for s in splits:
         mask = np.zeros(len(panel), dtype=bool)
         mask[s.train_idx] = True
-        models = reference_models(panel, train_mask=mask)
-        for name, p in models.items():
+        for name, p in reference_models(panel, train_mask=mask).items():
             oos.setdefault(name, []).append(p[s.test_idx])
-        oos_y.append(panel["result"].to_numpy()[s.test_idx])
+
+        tr, te = s.train_idx, s.test_idx
+        oos.setdefault("ordered logit (ratings)", []).append(
+            OrderedLogit().fit(X[tr], y_all[tr]).predict_proba(X[te]))
+        if not args.skip_catboost:
+            oos.setdefault("catboost (ratings)", []).append(
+                CatBoostBaseline().fit(X[tr], y_all[tr]).predict_proba(X[te]))
+
+        oos_y.append(y_all[te])
 
     y_oos = np.concatenate(oos_y)
     rows = [summary(np.vstack(v), y_oos, label=k) for k, v in oos.items()]
@@ -130,7 +149,9 @@ def main() -> None:
     print("  Published anchors: market RPS 0.1905 over 19 Serie A seasons")
     print("  (Pitcan 2026); bookmaker consensus 0.2063 on the 2023 Soccer")
     print("  Prediction Challenge, where the best deep model managed 0.2195.")
-    print("  A uniform forecast scores log loss ln(3) = 1.0986 exactly.")
+    print("  A uniform forecast scores log loss ln(3) = 1.0986 exactly, and")
+    print("  CatBoost on pi-ratings scored 0.2085 over 300k matches in Yeung")
+    print("  et al. (2024), beating their transformer encoder at 0.2098.")
 
     print()
     print("=" * 78)
