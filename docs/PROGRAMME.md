@@ -6,7 +6,7 @@
 
 ## Where we are — read this first
 
-**Last session: 2026-08-17.** The football study is finished and settled; the programme is standing up around it.
+**Last session: 2026-08-17.** The football study is finished and settled; the programme is standing up around it. 277 tests green at close.
 
 **Done**
 - Football v2 built, measured, and its betting question answered — see the graveyard below.
@@ -15,7 +15,7 @@
 
 **Next, in order**
 
-1. **Flesh out `docs/hypotheses/` entries for H1–H4** — currently only listed on the status board below, with no files behind them.
+1. **Flesh out `docs/hypotheses/` entries for H1–H4** — copy `docs/hypotheses/TEMPLATE.md` per hypothesis. Currently only listed on the status board below, with no files behind them.
 2. **Forward-validation workflow** (`.github/workflows/forecast.yml`). Weekly cron: refresh CSVs, retrain (~60s), predict upcoming fixtures, commit a prediction file timestamped *before* kickoff, grade past ones as results land. Plain Python, no Claude in the loop, no secrets — `football-data.co.uk/fixtures.csv` is free and unauthenticated. **Land this early**, so the ledger accumulates while everything else proceeds.
 3. **H1 pre-registered, then run.** Zero new data.
 4. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first.
@@ -41,11 +41,27 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 
 ## The count
 
-**Configurations evaluated to date: ~38.**
+**Configurations evaluated to date: 47.**
 
-Seeded honestly rather than from zero: ~28 disclosed in `docs/PREREGISTRATION.md` (Elo tier-shift sweep, net ablation variants, learning rates, feature sets, training pools, sequence-branch sizes, Dixon-Coles configs) plus ~10 from the post-Phase-6 confidence analysis (8 sweep thresholds and the calibration/CLV bucket breakdowns).
+| family | n | detail |
+|---|---|---|
+| Elo tier-shift values | 11 | 0, 38, 50, 65, 71, 76, 85, 90, 100, 130, 160 |
+| Net ablation variants | 8 | full, no team emb, no league emb, no embeddings, no goals head, single member, wide h=256, no dropout |
+| Confidence thresholds | 8 | 0.34 … 0.70 |
+| Dixon-Coles (Eredivisie) | 4 | two ξ × two lookbacks |
+| Learning rates | 3 | 3e-3, 1e-3, 3e-4 |
+| Feature sets | 3 | 7 rating, 49 all, 5 core without the moved flags |
+| Sequence branch | 3 | none, GRU(32), GRU(64) |
+| Training pools | 2 | panel-only, full 296k corpus |
+| Confidence/CLV bucket analyses | 2 | RPS-vs-market by bucket, CLV by bucket |
+| Tier-2 squad encoder arms | 2 | with / without |
+| Phase 6 pre-registered run | 1 | |
 
-This number goes up for **every** configuration scored, including ones abandoned after a single look. A search whose own count is wrong is theatre. Distinguishing a 2% edge from zero needs ~45,000 bets; the count is what stops a widening search quietly manufacturing one.
+**⚠️ This count was seeded at ~38 and corrected to 47 on its first reconciliation.** `docs/PREREGISTRATION.md` disclosed 7 tier-shift values where 11 were actually swept, and the tier-2 arms and feature-set variants were never counted at all. The pre-registration is a frozen record and is deliberately **not** edited retroactively — this registry carries the live number, and the discrepancy is recorded here rather than smoothed over.
+
+That correction is the step working as designed. The failure mode is never a dishonest entry; it is a configuration tried casually, found uninteresting, and never written down.
+
+This number goes up for **every** configuration scored. Distinguishing a 2% edge from zero needs ~45,000 bets; the count is what stops a widening search quietly manufacturing one.
 
 ## Status board
 

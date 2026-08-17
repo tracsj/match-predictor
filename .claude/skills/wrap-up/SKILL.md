@@ -29,7 +29,7 @@ Before we close this session:
 
 5. **Test suite** — Run `uv run pytest -q`. The harness self-tests are what make every number in this repo trustworthy: the cheater probe, the poisoned-split leak guard, the closed-form margin check, the published-band check on the market. **A failure here is not flaky — it means something real broke.** Do not close a session on a red suite without saying so explicitly.
 
-6. **Files** — Flag any file over 150 lines and suggest how to split it.
+6. **Files** — 150 lines is the wrong threshold for this repo and flagging against it produces noise: 20+ files exceed it and most are cohesive (`net.py` 519, `footballdata.py` 477, `betting.py` 382). **Flag only the top 3, and only when a file has grown since last session or has become genuinely multi-purpose.** A long module that does one thing well is not a finding.
 
 7. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, `PREREGISTRATION.md`, and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
 
