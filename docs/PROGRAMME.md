@@ -39,7 +39,7 @@ The CI corpus reproduced local exactly: 296,218 matches, 2026-27 at 253 matches 
 
 **Next, in order**
 
-1. **Watch the first scheduled run, Tuesday 13:15 UTC.** It is the first with a non-empty horizon, so it is the first to exercise training and to write an actual prediction file.
+1. **Check Tuesday's scheduled run (13:15 UTC) — it is the first with a non-empty horizon**, so the first to exercise training on a runner and the first to write a real `predictions/YYYY-MM-DD.csv`. Concretely: `gh run list --workflow=forecast.yml --limit 3`, then `gh run view <id> --log` and confirm three things — that the predict step reports a fixture count rather than "no upcoming fixtures", that training completed inside the 120-minute timeout (unmeasured on 2 vCPUs; 4m05s locally), and that `predictions/` gained a file. If it timed out, raise the runner rather than cutting seeds — see the registry ruling below.
 2. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model that makes a run fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
 2. **H1 pre-registered, then run.** Zero new data, capped at 2024/25. Its file names the three things still open, chiefly the single pre-specified tier contrast rather than a five-way search.
 3. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
@@ -86,6 +86,14 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 | Confidence/CLV bucket analyses | 2 | RPS-vs-market by bucket, CLV by bucket |
 | Tier-2 squad encoder arms | 2 | with / without |
 | Phase 6 pre-registered run | 1 | |
+
+**Reconciled 2026-08-17 (second session): the count stays at 47.** Nothing was evaluated in the registry's sense. Three things ran that could be mistaken for evaluations, so each is named rather than left to inference:
+
+1. **A forward dry run** trained the pre-registered `NetConfig` over three seeds and predicted 127 fixtures. Same configuration, and the fixtures were unplayed — no RPS, no PnL, nothing scored against an outcome. This is the retrain ruled on below.
+2. **A grading dry run** on 400 resolved matches produced CLV and ROI figures across four price columns. The "model" was the **de-vigged exchange close itself** — a deliberate control, not a candidate. It placed zero bets into its own prices, which is the closed-form check that the price join is right. Its CLV of 1.13 is the look-ahead in the test harness announcing itself, exactly as it should.
+3. **A benchmark comparison** measured overround and de-vigged RPS for Pinnacle, exchange and Bet365 closing on 16,875 matches. That measures *markets*, not model configurations, and it was forced by a vendor removing a column rather than chosen by looking at results.
+
+None of the three searched for edge, so counting them would overstate the search as surely as omitting a real one understates it.
 
 **⚠️ This count was seeded at ~38 and corrected to 47 on its first reconciliation.** `docs/PREREGISTRATION.md` disclosed 7 tier-shift values where 11 were actually swept, and the tier-2 arms and feature-set variants were never counted at all. The pre-registration is a frozen record and is deliberately **not** edited retroactively — this registry carries the live number, and the discrepancy is recorded here rather than smoothed over.
 

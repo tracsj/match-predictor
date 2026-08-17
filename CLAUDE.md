@@ -16,13 +16,13 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 
 | file | what is in it |
 |---|---|
-| `docs/PROGRAMME.md` | **the handoff** ("Where we are"), plus the hypothesis registry — status board, graveyard, and the running count of every configuration ever tested |
-| `docs/hypotheses/*.md` | one file per hypothesis: pre-registration inline, result when settled |
+| `docs/PROGRAMME.md` | **the handoff** ("Where we are"), plus the hypothesis registry — status board, graveyard, the running count of every configuration ever tested, and the ruling on what does and does not increment it |
+| `docs/hypotheses/*.md` | one file per hypothesis: pre-registration inline, result when settled. H1–H4 exist and are all `proposed` — each names what is still open before it may run |
 | `docs/PREREGISTRATION.md` | the football betting rule, prices and holdout, fixed before any PnL existed |
 | `docs/FORWARD_LEDGER.md` | the forward record — predictions committed before kickoff, graded as results land. Rewritten from `predictions/*.csv` on every run, never appended |
 | `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting |
 | `docs/TIER2_RESULT.md` | what a starting XI is worth (nothing measurable), and the SportMonks upgrade recommendation |
-| `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it |
+| `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it — including **Pinnacle's removal in 2026/27** and the exchange-vs-Pinnacle benchmark measurement, what `fixtures.csv` holds, and why `download_all` cannot refresh |
 | `docs/research/01-neural-nets-for-match-prediction.md` | what wins on this task, with RPS numbers tagged to their datasets |
 | `docs/research/02-betting-evaluation-and-odds-data.md` | how to build a backtest that would tell you the truth if the model were bad |
 

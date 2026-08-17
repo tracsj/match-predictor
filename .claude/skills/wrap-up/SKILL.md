@@ -9,7 +9,15 @@ Before we close this session:
 
 1. **Session summary** — 3–5 bullets on what we did today.
 
-2. **Permissions audit** — Read `.claude/settings.json`. Flag any allow rules matching banned patterns: `node:*`, `python3:*`, `curl:*` (unscoped), `rm:*`, `uv:*` (the bare wildcard includes `uv run`, which is code execution), or any `*:*` wildcard. Remove or tighten before proceeding. Takes 10 seconds; prevents security regressions persisting across sessions.
+2. **Permissions audit** — Check the **`allow` block only** of `.claude/settings.json` (and `settings.local.json` if present) for banned patterns: `node:*`, `python3:*`, `curl:*` (unscoped), `rm:*`, `uv:*` (the bare wildcard includes `uv run`, which is code execution), or any `*:*`.
+
+   **Parse the JSON; do not grep the file.** Several banned strings legitimately appear in the `deny` block — `Bash(rm:*)` is *supposed* to be there — so a text search reports a finding every time and the finding is disproved the same way every time.
+
+   ```python
+   import json; s = json.load(open(".claude/settings.json"))["permissions"]
+   banned = ("node:*", "python3:*", "curl:*", "rm:*", "uv:*", "*:*")
+   print([r for r in s["allow"] if any(b in r for b in banned)] or "clean")
+   ```
 
 3. **Registry reconciliation** — *the project-specific step, and the one most likely to be skipped.*
 
@@ -31,7 +39,7 @@ Before we close this session:
 
 6. **Files** — 150 lines is the wrong threshold for this repo and flagging against it produces noise: 20+ files exceed it and most are cohesive (`net.py` 519, `footballdata.py` 477, `betting.py` 382). **Flag only the top 3, and only when a file has grown since last session or has become genuinely multi-purpose.** A long module that does one thing well is not a finding.
 
-7. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, `PREREGISTRATION.md`, and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
+7. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, `PREREGISTRATION.md`, `FORWARD_LEDGER.md` (machine-written by the forecast workflow — never edit it by hand), and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
 
 8. **Context file descriptions audit** — for any file added to or updated this session, check that its row in CLAUDE.md's "Where the detail lives" table names what is now inside it. If you find one stale or missing, check siblings — staleness clusters.
 
