@@ -212,7 +212,11 @@ def test_the_net_learns_something_on_data_with_known_structure():
     df = toy(4000, seed=7)
     v = build_vocab(df)
     X = np.zeros((len(df), 1))          # nothing but team identity to learn from
-    cfg = NetConfig(members=4, hidden=32, max_epochs=40, patience=8, lr=3e-3)
+    # Embeddings are OFF by default (they overfit on the real corpus -- see
+    # NetConfig). This test is precisely about whether they CAN learn team
+    # strength when there is nothing else, so it turns them on explicitly.
+    cfg = NetConfig(team_dim=12, members=4, hidden=32, max_epochs=40,
+                    patience=8, lr=3e-3)
     model, meta = train_net(df, X, v, cfg)
     out = predict(model, df, X, v, meta)
 
@@ -226,8 +230,8 @@ def test_goal_head_predicts_plausible_scoring_rates():
     df = toy(3000, seed=8)
     v = build_vocab(df)
     X = np.zeros((len(df), 1))
-    model, meta = train_net(df, X, v, NetConfig(members=4, hidden=32,
-                                                max_epochs=40, patience=8))
+    model, meta = train_net(df, X, v, NetConfig(team_dim=12, members=4, hidden=32,
+                                                max_epochs=40, patience=8, lr=3e-3))
     out = predict(model, df, X, v, meta)
     mean_rates = out["goal_rates"].mean(axis=0)
     actual = np.array([df["fthg"].mean(), df["ftag"].mean()])

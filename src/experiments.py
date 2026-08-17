@@ -40,25 +40,43 @@ def paired(a: np.ndarray, b: np.ndarray, y) -> dict:
 
 
 def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
-                     calibrate: bool = True, seeds=(0,), verbose=False):
+                     calibrate: bool = True, seeds=(0,), verbose=False,
+                     train_pool: pd.DataFrame | None = None):
     """Fit the net on each walk-forward split; return stacked OOS predictions.
+
+    `train_pool` lets the model train on MORE matches than it is evaluated on.
+    The test set has to carry Pinnacle closing odds, because that is the
+    benchmark -- but the training set does not. Restricting both to the priced
+    panel throws away 85% of the corpus, and the literature is explicit that
+    deep models only become competitive somewhere between 100k and 300k
+    matches across many leagues. Training rows are still taken strictly before
+    the test window opens, so nothing leaks.
 
     Averaging over seeds is not decoration. Yeung et al.'s defence of their
     deep model against CatBoost was lower loss variance rather than lower
     loss, so a single-seed number on this task is not a measurement.
     """
-    vocab = build_vocab(panel)
+    pool = panel if train_pool is None else train_pool
+    vocab = build_vocab(pool)
     X = panel[features].to_numpy(float)
+    X_pool = pool[features].to_numpy(float)
+    pool_kick = pd.to_datetime(pool["kickoff"]).to_numpy()
     y_all = panel["result"].to_numpy()
 
     hda, hda_cal, from_goals, ys = [], [], [], []
     for s in season_walk_forward(panel, min_train_seasons=3):
         assert_no_leakage(panel, s)
-        tr, te = panel.iloc[s.train_idx], panel.iloc[s.test_idx]
+        te = panel.iloc[s.test_idx]
+        if train_pool is None:
+            tr, X_tr = panel.iloc[s.train_idx], X[s.train_idx]
+        else:
+            keep = pool_kick < np.datetime64(s.test_start)
+            tr, X_tr = pool[keep], X_pool[keep]
+            assert pd.to_datetime(tr["kickoff"]).max() < s.test_start
 
         seed_p, seed_g, seed_logits = [], [], []
         for seed in seeds:
-            model, meta = train_net(tr, X[s.train_idx], vocab,
+            model, meta = train_net(tr, X_tr, vocab,
                                     NetConfig(**{**cfg.__dict__, "seed": seed}))
             out = predict(model, te, X[s.test_idx], vocab, meta)
             seed_p.append(out["hda"])
@@ -70,7 +88,7 @@ def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
                 # it on the test season would manufacture the result outright.
                 cut = int(len(tr) * 0.85)
                 val = tr.iloc[cut:]
-                val_out = predict(model, val, X[s.train_idx][cut:], vocab, meta)
+                val_out = predict(model, val, X_tr[cut:], vocab, meta)
                 scaler = TemperatureScaler().fit(val_out["logits"], val["result"])
                 seed_logits.append(scaler.transform(out["logits"]))
 
@@ -89,13 +107,25 @@ def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
     return out
 
 
-def baseline_predictions(panel, features=RATING_FEATURES):
+def baseline_predictions(panel, features=RATING_FEATURES, train_pool=None):
+    """Ordered logit on the same splits. `train_pool` mirrors the net's option
+    so both models can be given identical training data -- otherwise the
+    comparison measures the data, not the model."""
     X = panel[features].to_numpy(float)
     y_all = panel["result"].to_numpy()
+    if train_pool is not None:
+        X_pool = train_pool[features].to_numpy(float)
+        y_pool = train_pool["result"].to_numpy()
+        pool_kick = pd.to_datetime(train_pool["kickoff"]).to_numpy()
+
     P, Y = [], []
     for s in season_walk_forward(panel, min_train_seasons=3):
-        P.append(OrderedLogit().fit(X[s.train_idx], y_all[s.train_idx])
-                 .predict_proba(X[s.test_idx]))
+        if train_pool is None:
+            xt, yt = X[s.train_idx], y_all[s.train_idx]
+        else:
+            keep = pool_kick < np.datetime64(s.test_start)
+            xt, yt = X_pool[keep], y_pool[keep]
+        P.append(OrderedLogit().fit(xt, yt).predict_proba(X[s.test_idx]))
         Y.append(y_all[s.test_idx])
     return np.vstack(P), np.concatenate(Y)
 

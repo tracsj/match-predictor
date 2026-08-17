@@ -100,12 +100,30 @@ def build_vocab(df: pd.DataFrame) -> Vocab:
 
 @dataclass
 class NetConfig:
-    team_dim: int = 12
-    league_dim: int = 6
+    """Defaults are the configuration the ablation actually supports, not the
+    one the architecture section argues for. Measured over 45,629 out-of-sample
+    matches, three seeds:
+
+        full (team 12, league 6, 8 members)   RPS 0.20813
+        no team embedding                         0.20795   t -2.81 vs full
+        no league embedding                       0.20797   t -2.72 vs full
+        single trunk member                       0.20799   t -1.92 vs full
+        wide, hidden 256                          0.20808   (and 161s vs 60s)
+
+    So the embeddings and the extra capacity both HURT at this scale, and the
+    honest default is the small one. Set team_dim/league_dim above zero to
+    turn them back on -- worth retrying if the corpus ever grows toward the
+    100k-300k range where the literature finds deep models competitive.
+
+    The goals head is the one component that earns its place: removing it
+    costs 0.00007 RPS and, obviously, the entire scoreline/over-under output.
+    """
+    team_dim: int = 0           # measured: embeddings overfit at this scale
+    league_dim: int = 0
     hidden: int = 96
-    members: int = 8            # parallel ensemble members (TabM-style)
+    members: int = 1            # 8 members cost 3x the time for nothing
     dropout: float = 0.2
-    lr: float = 3e-3
+    lr: float = 1e-3            # 3e-3 overfits within one epoch
     weight_decay: float = 1e-4
     emb_weight_decay: float = 1e-3   # embeddings overfit first, so decay harder
     batch_size: int = 1024
