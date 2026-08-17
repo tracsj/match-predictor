@@ -1,0 +1,44 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Bash(git checkout -b:*)",
+      "Bash(git switch:*)",
+      "Bash(git stash list:*)",
+      "Bash(git remote -v:*)",
+      "Bash(git mv:*)",
+      "Bash(uv sync:*)",
+      "Bash(uv add:*)",
+      "Bash(uv remove:*)",
+      "Bash(uv lock:*)",
+      "Bash(uv pip list:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv run ruff:*)",
+      "Bash(uv run python -m src:*)",
+      "Bash(uv run python -m pytest:*)",
+      "WebFetch(domain:www.football-data.co.uk)",
+      "WebFetch(domain:api.sportmonks.com)"
+    ],
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git commit --amend:*)",
+      "Bash(git config:*)",
+      "Bash(uv run python -c:*)",
+      "Bash(uv run python -:*)",
+      "Edit(data/processed/**)",
+      "Edit(v1/**)"
+    ]
+  }
+}
