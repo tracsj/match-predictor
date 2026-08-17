@@ -6,26 +6,35 @@
 
 ## Where we are — read this first
 
-**Last session: 2026-08-17.** The football study is finished and settled; the programme is standing up around it. 277 tests green at close.
+**Last session: 2026-08-17 (second session that day).** Forward validation is built and the four hypothesis files exist. 299 tests green at close.
 
 **Done**
 - Football v2 built, measured, and its betting question answered — see the graveyard below.
 - `.claude/` setup: project CLAUDE.md, settings, `/wrap-up`. This repo had none before.
 - This registry, seeded with an honest configuration count.
+- **Forward validation, end to end.** `src/data/fixtures.py` (unplayed-fixture ingest), the `unplayed` contract in `src/features/horizon.py`, `src/forward.py` (predict and record), `src/grade.py` (grade and write the ledger), `src/refresh.py`, and `.github/workflows/forecast.yml` on a Tuesday/Friday cron. Dry-run measured at **4m05s locally** for the full path including three training seeds.
+- **H1–H4 files written**, in `docs/hypotheses/`. All `proposed`; none pre-registered.
+
+**The finding that changed the programme.** **football-data dropped Pinnacle entirely in 2026/27** — the columns are absent from the schema, not empty, and the last populated `psch` anywhere is 2026-01-14. The replacement is the **Betfair Exchange close**, and measuring the two on the 16,875 matches carrying both showed it is **not a downgrade**: equally accurate (de-vigged RPS 0.20404 vs 0.20408) on a quarter of the margin (overround 1.0089 vs 1.0389), with prices 3.9% longer. Beating it is at least as hard. Full detail and the commands in `docs/research/00-measured-facts.md`.
 
 **Next, in order**
 
-1. **Flesh out `docs/hypotheses/` entries for H1–H4** — copy `docs/hypotheses/TEMPLATE.md` per hypothesis. Currently only listed on the status board below, with no files behind them.
-2. **Forward-validation workflow** (`.github/workflows/forecast.yml`). Weekly cron: refresh CSVs, retrain (~60s), predict upcoming fixtures, commit a prediction file timestamped *before* kickoff, grade past ones as results land. Plain Python, no Claude in the loop, no secrets — `football-data.co.uk/fixtures.csv` is free and unauthenticated. **Land this early**, so the ledger accumulates while everything else proceeds.
-3. **H1 pre-registered, then run.** Zero new data.
-4. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first.
+1. **Watch the first two scheduled runs.** The path has never fired on a GitHub runner. Training wall-time on 2 vCPUs is unmeasured — 4m locally, so budget 12–20 min, and the workflow allows 120.
+2. **H1 pre-registered, then run.** Zero new data, capped at 2024/25. Its file names the three things still open, chiefly the single pre-specified tier contrast rather than a five-way search.
+3. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
+4. **H3 in its free form**, which is cheaper than the status board previously said — see the correction below.
 5. **H2 pre-registered, then run.**
-6. **H3 ingest** (sportsbookreviewsonline — needs a browser user-agent or it 404s) and pre-registration.
 
 **Open threads worth knowing**
-- `uv run python -c` is denied in `.claude/settings.json` on purpose, to push analysis into re-runnable files. If it turns out to be more friction than it is worth, that is one line to remove.
-- The `no-script-file-mutation.py` hook was **not** adopted here. Its promotion review is dated on-or-after 2026-09-07 and requires re-running corpus validation against this repo's own transcripts. Evidence for that review: the 2026-08-17 session used script-based file edits heavily.
-- Forward CLV may have to grade against Bet365 or market-average closing, since Pinnacle closing stops February 2026. Establish which columns are populated in 2026-27 on the first run.
+- `uv run python -c` is denied in `.claude/settings.json` on purpose, to push analysis into re-runnable files. It cost three extra steps this session and was worth it each time — the scripts are re-runnable.
+- The `no-script-file-mutation.py` hook was **not** adopted here. Its promotion review is dated on-or-after 2026-09-07 and requires re-running corpus validation against this repo's own transcripts. Evidence for that review: the 2026-08-17 sessions used script-based file edits heavily.
+- **`HxG`/`AxG` arrived in 2026/27** and the loader parses them away. Per-division, not universal (present B1, N1; absent EC). A genuinely new feature source and the first new one in a while.
+- **Eight 2026/27 divisions are still 404 upstream** (D1, E1, E2, F1, G1, I1, I2, T1) and are re-memoised in `_missing.json` on every refresh until they publish. `refresh_current()` purges and retries them each run, so this heals itself — but a division silently missing from the ledger for weeks would look exactly like this, so check the refresh line in the workflow log.
+- `new_league_fixtures.csv` covers 14 of the 16 extra countries and is **not** read yet, so the forward path serves the 22 main divisions only.
+
+**Corrections to this board made 2026-08-17**
+- **H3 is not "new ingest".** football-data already carries a pre-close and a closing price for the same match, so a first version costs zero new data. The `sportsbookreviewsonline` ingest buys the *true opening* line and should follow only if the free version shows something.
+- **H2 is not three markets.** Of O/U 2.5, BTTS and correct score, only **O/U 2.5 is in the feed**. The other two need new ingest, so H2's "zero new data" applies to a third of what it claimed.
 
 ---
 
@@ -63,14 +72,22 @@ That correction is the step working as designed. The failure mode is never a dis
 
 This number goes up for **every** configuration scored. Distinguishing a 2% edge from zero needs ~45,000 bets; the count is what stops a widening search quietly manufacturing one.
 
+**Ruling, 2026-08-17: a scheduled forward retrain does NOT increment the count.** `src/forward.py` retrains on every run, but it retrains the *same* configuration — the `NetConfig` defaults fixed by `docs/PREREGISTRATION.md`, three seeds, `ALL_FEATURES` — on data that has grown by a few hundred matches. Nothing is being chosen, and a count that ticked up twice a week would stop meaning anything within a month.
+
+What *would* increment it: changing the seed count, the feature set, the architecture, the betting rule, or the price column, in the forward path or anywhere else. If a run has to be made cheaper on CI, **use a bigger runner rather than fewer seeds** — the runner is free of consequence, the seed count is a configuration change.
+
+**The price-ladder change is also not a configuration.** Moving from Pinnacle close to exchange close is forced by the vendor removing a column, not chosen by looking at results, and the replacement was measured as no softer before being adopted. It is a documented benchmark change and belongs in the record rather than the count.
+
 ## Status board
 
-| ID | hypothesis | status | cost to first answer | notes |
-|---|---|---|---|---|
-| H1 | Lower-division football is less efficiently priced | `proposed` | zero new data | ⚠️ overround *rises* with tier — the headwind points the wrong way |
-| H2 | Derived/correlated markets (O/U, BTTS, correct score) | `proposed` | zero new data | reuses the existing Poisson scoreline head |
-| H3 | Line movement is predictable (open → close) | `proposed` | new ingest, free | strongest published evidence; targets the market, not the match |
-| H4 | Betfair AU/NZ niche leagues (AFL, NRL, NBL, BBL) | `proposed` | new ingest, free | best capacity-adjusted option — the exchange does not ban winners |
+| ID | hypothesis | status | cost to first answer | file | notes |
+|---|---|---|---|---|---|
+| H1 | Lower-division football is less efficiently priced | `proposed` | zero new data, capped at 2024/25 | `H1-lower-division-inefficiency.md` | ⚠️ overround *rises* with tier — the headwind points the wrong way. Pinnacle coverage is uniform across tiers, so it is answerable |
+| H2 | Derived markets (**O/U 2.5 only** — see below) | `proposed` | zero new data for O/U; new ingest for the rest | `H2-derived-markets.md` | reuses the Poisson head, which has never been graded for betting. Blocked on the n-outcome work |
+| H3 | Line movement is predictable (pre-close → close) | `proposed` | **zero new data** for the free form | `H3-line-movement.md` | strongest published evidence; targets the market, not the match. CLV is the objective rather than a proxy, so it converges fast |
+| H4 | Betfair AU/NZ niche leagues (AFL, NRL, NBL, BBL) | `proposed` | new ingest, **source unverified** | `H4-exchange-niche-leagues.md` | best capacity-adjusted option — the exchange does not ban winners. The only one with a genuinely clean holdout |
+
+**H2's scope was overstated on this board.** Only O/U 2.5 is in the football-data feed; BTTS and correct score are not there at all. **H3's cost was overstated too** — the pre-close and closing legs are both already in `matches.parquet`, so the free version needs no ingest.
 
 Statuses run `proposed → pre-registered → running → settled`. A hypothesis may not move to `running` until its pre-registration is committed.
 

@@ -28,6 +28,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.features.horizon import unplayed_flags
+
 __all__ = ["SeqParams", "build_sequences", "SEQ_FEATURES"]
 
 # Per past match, from the perspective of the team whose sequence it is.
@@ -80,6 +82,7 @@ def build_sequences(df: pd.DataFrame, params: SeqParams = SeqParams()
     hst, ast = col("hst"), col("ast")
     eh, ea = col("elo_home"), col("elo_away")
     kick = pd.to_datetime(df["kickoff"]).to_numpy()
+    unplayed = unplayed_flags(df)
 
     for i in range(n):
         now = kick[i]
@@ -97,6 +100,12 @@ def build_sequences(df: pd.DataFrame, params: SeqParams = SeqParams()
                     min(float(days), params.max_days_ago) / 7.0,
                 )
                 mask[i, side, offset + j] = True
+
+        # A fixture with no result appends nothing to either team's deque. The
+        # naive version records a fabricated 0-0 loss and then nan_to_num wipes
+        # the trace of it -- see src/features/horizon.py.
+        if unplayed[i]:
+            continue
 
         gd = gh[i] - ga_[i]
         z = lambda e: (float(e) - params.elo_centre) / params.elo_scale

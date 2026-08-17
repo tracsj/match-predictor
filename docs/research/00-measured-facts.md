@@ -172,7 +172,95 @@ The full closing suite from 2019/20 adds per-book closing 1X2 (`B365C*`), `MaxC*
 
 **Collection timing caveat**: per <https://www.football-data.co.uk/matches.php>, "pre-close" odds are snapshotted Friday ≤17:00 BST for weekend fixtures and Tuesday ≤13:00 for midweek. So the pre-close price is a genuine 1–3 day-out price — not an opening price, and not a last-second one.
 
+### ⚠️⚠️ Pinnacle is GONE from 2026/27 — the columns no longer exist
+
+**Measured 2026-08-17. This supersedes the section below, which understates the
+situation: the decay described there does not end in a gap, it ends in removal.**
+
+```bash
+curl -s https://www.football-data.co.uk/mmz4281/2627/B1.csv | tr -d '\r' \
+  | sed '1s/^\xEF\xBB\xBF//' | head -1 | tr ',' '\n' | grep -cxE 'PSH|PSD|PSA|PSCH|PSCD|PSCA'
+# 0
+```
+
+`PSH`, `PSD`, `PSA`, `PSCH`, `PSCD`, `PSCA`, `P>2.5`, `PAHH` are all absent from
+the 2026/27 schema — not empty, absent. The `PP*` columns in that file are
+**Paddy Power**, not Pinnacle (`notes.txt:86-91`). The last populated `PSCH`
+anywhere in the corpus is **2026-01-14**.
+
+Two other 2026/27 schema changes in the same diff:
+
+- **`HxG`/`AxG` (expected goals) are NEW**, per-division rather than universal —
+  present in B1 and N1, absent in EC. The loader does not map them, so they are
+  currently parsed away.
+- Bookmaker roster churned: Coral, Ladbrokes and BetMGM out, Skybet (`SKB*`) in.
+  `Referee` was dropped from results files but survives in `fixtures.csv`.
+
+**Not established:** whether the removal is deliberate or a feed outage. The site
+still links a "Pinnacle Closing Odds Bet Tracker" (`matches.php:108`) and no
+announcement was found. Re-check before quoting, and treat it as permanent for
+planning purposes.
+
+#### The replacement, and it is not a downgrade
+
+The standing rule is to lead the sharpest price. The Betfair Exchange is now that
+price, and it is in the feed on both legs — `BFEH/BFED/BFEA` pre-close,
+`BFEC*` closing. Measured on the **16,875 matches carrying both closes**
+(`scripts`-free reproduction: de-vig with `src.eval.devig.devig(method="shin")`,
+score with `src.eval.metrics.rps`):
+
+| book | mean overround | median overround | de-vigged RPS |
+|---|---|---|---|
+| Pinnacle close | 1.0389 | 1.0362 | 0.20408 |
+| **exchange close** | **1.0089** | **1.0076** | **0.20404** |
+| Bet365 close | 1.0698 | 1.0669 | 0.20327 |
+
+Exchange prices run **3.9% longer** than Pinnacle's on the same matches (mean
+ratio 1.0386; home 1.0313, draw 1.0311, away 1.0534).
+
+**So the exchange close is an equally accurate estimate of the truth on a quarter
+of the margin.** CLV against it is at least as demanding as against Pinnacle,
+because there is less vig to hide in — the intuitive reading, that losing
+Pinnacle means accepting a softer benchmark, is wrong. What *is* flattered is
+exchange ROI, which is pre-commission; 2–5% of net winnings would absorb most of
+that 3.9%. CLV is immune, since both legs are exchange prices.
+
+**Exchange coverage begins in 2024/25**, so this substitution works forward and
+not backward:
+
+| season | matches | `bfec*` | `bfe*` pre | `psc*` |
+|---|---|---|---|---|
+| 2021-22 → 2023-24 | ~7,800/yr | 0 | 0 | ~complete |
+| 2024-25 | 7,681 | 7,680 | 7,632 | 7,681 |
+| 2025-26 | 7,646 | 7,205 | 7,131 | 2,964 |
+| 2026-27 | 99 | 99 | 98 | 0 |
+
+Anything testing the 2012/13–2024/25 panel still needs Pinnacle. Anything forward
+uses the exchange.
+
+#### Pinnacle closing coverage is UNIFORM across division tiers
+
+Measured 2026-08-17 from the raw per-season files. Relevant because H1 assumes
+lower divisions are answerable, and the intuitive guess — that a sharp book
+covers League Two worse than the Premier League — is wrong.
+
+`PSCH` is ~100% populated in **every** tier from 2012/13 through 2024/25: E0, E1,
+E2, E3, EC, SC0, SC1, D1, D2, I1, I2, SP1, SP2, F1, F2, N1, B1, P1, T1, G1 all
+show `rows == PSCH` for 2023/24 and 2024/25.
+
+Two exceptions worth carrying:
+
+- **SC2 and SC3 begin at 2016/17**, not 2012/13. Not previously recorded.
+- 2025/26 pooled coverage is **2,964/7,647 ≈ 38.8%** and zero after 2026-01-14.
+
+So H1's "zero new data" claim holds, capped at 2024/25.
+
 ### ⚠️ Pinnacle closing odds stop partway through 2025/26
+
+*(Superseded by the section above — kept because the monthly decay profile is
+still the record of how it happened. The conclusion "evaluate against Bet365/Avg
+and label it a softer benchmark" is no longer the best available answer: use the
+exchange close, which is not softer.)*
 
 Measured from the built corpus (233,687 main-division matches), counting non-null `PSCH` by month for season 2025-26:
 
@@ -197,6 +285,68 @@ A search summary had claimed the Pinnacle feed became unreliable "since 2025-07-
 **Consequence for the backtest, and it is load-bearing:** the truth test is "de-vigged Pinnacle closing", and **2025/26 cannot supply it.** Either end the locked holdout at 2024/25, or evaluate 2025/26 against Bet365/Avg closing and label that column honestly as a softer benchmark. Do not quietly fall back to `AvgC` and keep calling it the closing line.
 
 Across the whole corpus (main + extra) **160,868 matches carry Pinnacle closing odds** — more than the 109k estimated from main divisions alone, because the extra-country files carry `PSCH` too.
+
+### What `fixtures.csv` actually contains
+
+Measured 2026-08-17. This is the feed the forward path reads, and four of its
+properties are load-bearing.
+
+```bash
+curl -s https://www.football-data.co.uk/fixtures.csv | tr -d '\r' | head -1        # 94 cols
+curl -s https://www.football-data.co.uk/fixtures.csv | tr -d '\r' | awk 'NR>1 && $0!~/^,*$/' | wc -l   # 127
+```
+
+1. **It is a rolling ~4-day window, not a season fixture list.** The snapshot held
+   127 rows across 14 of the 22 main divisions, dated 14–17 August. **So a
+   schedule reading it must fire at least every four days or fixtures are never
+   predicted at all.** A weekly cron silently drops them.
+2. **No Pinnacle.** `PSH/PSD/PSA` absent entirely, consistent with the removal
+   above. Populated: `B365H/D/A` 127/127, `MaxH/D/A` 127/127, `AvgH/D/A` 127/127,
+   **`BFEH/BFED/BFEA` 117/127**. Every `*C*` closing column is present in the
+   header and **0/127** populated, as it must be before kickoff.
+3. **It retains already-played fixtures**, so filtering on kickoff is mandatory
+   rather than defensive. `Time` is 127/127 populated and UK local.
+4. **93 of its 94 columns exist in the 2026/27 results schema** (only `Referee`
+   differs), so it is the current-season results file minus post-match columns.
+   The mapping problem is availability, not naming.
+
+Bare `curl` works — no browser user-agent needed. UTF-8 BOM on column 1.
+
+**A second, separate feed covers the extra-country leagues:**
+`new_league_fixtures.csv`, 116 rows, 14 of the 16 loader countries (no RUS, no
+SWZ), schema `Country,League,Date,Time,Home,Away,PSH,...`. Its `PSH/PSD/PSA` are
+**declared but 0/116 populated**. Not read by `src/data/fixtures.py`.
+
+### `download_all` cannot refresh, and `_missing.json` is the worse half
+
+Measured 2026-08-17, and it is the failure that would have quietly hollowed out
+the forward ledger.
+
+`download_all` skips any file already on disk *and* any key memoised in
+`_missing.json` — no mtime check, no force flag. So on a warm cache the
+current-season file is fetched exactly once and never updated.
+
+The second cache is the trap. Eight of the 2026/27 divisions were already
+memoised missing, because their files 404 upstream before the season starts:
+
+```
+main/2627/D1  main/2627/E1  main/2627/E2  main/2627/F1
+main/2627/G1  main/2627/I1  main/2627/I2  main/2627/T1
+```
+
+Meanwhile `fixtures.csv` was already carrying E1 and E2 fixtures. Deleting the
+files without purging those keys leaves those eight divisions permanently
+unfetched: predictions get made, nothing errors, and the ledger simply reports
+nothing for a third of the corpus.
+
+`footballdata.refresh_current()` does both, and `src/refresh.py` fails loudly if
+the current-season file count falls. Verified: the refresh retried all eight
+(they 404 again — genuinely not published yet) and the corpus grew 243 → 253
+matches, 17 → 18 divisions, where `download_all` alone gained nothing.
+
+**Results lag the fixtures feed.** On 2026-08-17 the latest result in the corpus
+was 2026-08-10 while the feed already listed 14–17 August. Grading is therefore
+always a few days behind prediction, by design rather than by fault.
 
 ### football-data serves a SUBSTITUTE file for a division-season that does not exist
 

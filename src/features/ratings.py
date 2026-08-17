@@ -37,6 +37,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.features.horizon import unplayed_flags
+
 __all__ = ["elo_features", "pi_rating_features", "add_ratings", "PiParams", "EloParams"]
 
 
@@ -139,6 +141,7 @@ def pi_rating_features(df: pd.DataFrame, params: PiParams = PiParams()) -> pd.Da
     country = df["country"].to_numpy()
     hk, ak = df["home_key"].to_numpy(), df["away_key"].to_numpy()
     gh, ga = df["fthg"].to_numpy(), df["ftag"].to_numpy()
+    unplayed = unplayed_flags(df)
 
     for i in range(n):
         H, A = (country[i], hk[i]), (country[i], ak[i])
@@ -157,6 +160,11 @@ def pi_rating_features(df: pd.DataFrame, params: PiParams = PiParams()) -> pd.Da
         out["pi_exp_gd"][i] = exp_gd
 
         # --- update, using the result we just scored against ---
+        # An unplayed fixture has no result to absorb. Writing one here would
+        # put NaN into the stored rating and poison every later row for both
+        # teams -- see src/features/horizon.py.
+        if unplayed[i]:
+            continue
         obs_gd = float(gh[i] - ga[i])
         err = abs(obs_gd - exp_gd)
         psi = p.c * np.log10(1.0 + err)
@@ -200,6 +208,7 @@ def elo_features(df: pd.DataFrame, params: EloParams = EloParams()) -> pd.DataFr
     div = df["div"].to_numpy()
     hk, ak = df["home_key"].to_numpy(), df["away_key"].to_numpy()
     gh, ga = df["fthg"].to_numpy(), df["ftag"].to_numpy()
+    unplayed = unplayed_flags(df)
 
     for i in range(n):
         H, A = (country[i], hk[i]), (country[i], ak[i])
@@ -237,6 +246,18 @@ def elo_features(df: pd.DataFrame, params: EloParams = EloParams()) -> pd.DataFr
         out["elo_home"][i], out["elo_away"][i] = rh, ra
         out["elo_diff"][i] = (rh + p.home_advantage) - ra
         out["elo_exp_home"][i] = exp_home
+
+        # An unplayed fixture is scored above and absorbed nowhere. Without this
+        # the next line raises on `int(nan)`, which is the loud half of the
+        # problem; the quiet half is in the other three builders.
+        #
+        # The season and tier bookkeeping above deliberately still runs: which
+        # division a team is in and whether it has changed are facts about the
+        # calendar, not about a result, and a promoted side's first fixture of
+        # the season should carry its `moved` flag whether or not it has kicked
+        # off yet.
+        if unplayed[i]:
+            continue
 
         gd = int(gh[i]) - int(ga[i])
         score = 1.0 if gd > 0 else (0.5 if gd == 0 else 0.0)

@@ -32,6 +32,8 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+from src.features.horizon import unplayed_flags
+
 __all__ = ["RollingParams", "add_rolling", "rolling_features"]
 
 WINDOWS = (5, 10)
@@ -98,6 +100,7 @@ def rolling_features(df: pd.DataFrame, params: RollingParams = RollingParams()) 
     hc, ac = col("hc"), col("ac")
     eh, ea = col("elo_home"), col("elo_away")
     kick = pd.to_datetime(df["kickoff"]).to_numpy()
+    unplayed = unplayed_flags(df)
 
     rows = []
     for i in range(len(df)):
@@ -145,6 +148,14 @@ def rolling_features(df: pd.DataFrame, params: RollingParams = RollingParams()) 
         rows.append(row)
 
         # --- absorb this match into history, AFTER recording the features ---
+        # Nothing to absorb from a fixture that has not been played. The naive
+        # version of this loop records it as a 0-0 defeat for both sides,
+        # because `3.0 if gd > 0 else (1.0 if gd == 0 else 0.0)` takes the last
+        # branch when gd is NaN, and stamps `last_played` so the next fixture's
+        # rest_days is wrong too. See src/features/horizon.py.
+        if unplayed[i]:
+            continue
+
         gd = gh[i] - ga_[i]
         hist[H].append({"gf": gh[i], "ga": ga_[i],
                         "pts": 3.0 if gd > 0 else (1.0 if gd == 0 else 0.0),

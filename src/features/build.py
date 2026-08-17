@@ -38,19 +38,24 @@ RATING_COLS = [
 ]
 
 
-def build(force: bool = False) -> pd.DataFrame:
-    if FEATURES_PARQUET.exists() and not force:
-        return pd.read_parquet(FEATURES_PARQUET)
+def build_frame(df: pd.DataFrame, verbose: bool = True) -> tuple:
+    """Run the whole feature pass over one chronological frame.
+
+    Shared by the cached corpus build and the forward build, so a horizon of
+    upcoming fixtures goes through exactly the same code as history rather than
+    a parallel implementation that could drift from it.
+    """
+    df = df.sort_values("kickoff").reset_index(drop=True)
 
     t = time.time()
-    df = pd.read_parquet(OUT_DIR / "matches.parquet")
-    df = df.sort_values("kickoff").reset_index(drop=True)
     df = add_ratings(df)
-    print(f"  ratings   {time.time() - t:5.1f}s")
+    if verbose:
+        print(f"  ratings   {time.time() - t:5.1f}s")
 
     t = time.time()
     df = add_rolling(df)
-    print(f"  rolling   {time.time() - t:5.1f}s")
+    if verbose:
+        print(f"  rolling   {time.time() - t:5.1f}s")
 
     # Row position in the full chronological corpus, so the sequence arrays
     # (which are row-aligned with this frame) can be indexed after filtering.
@@ -58,13 +63,70 @@ def build(force: bool = False) -> pd.DataFrame:
 
     t = time.time()
     seq, mask = build_sequences(df)
-    print(f"  sequences {time.time() - t:5.1f}s  shape {seq.shape}")
+    if verbose:
+        print(f"  sequences {time.time() - t:5.1f}s  shape {seq.shape}")
+    return df, seq, mask
+
+
+def build(force: bool = False) -> pd.DataFrame:
+    if FEATURES_PARQUET.exists() and not force:
+        return pd.read_parquet(FEATURES_PARQUET)
+
+    df = pd.read_parquet(OUT_DIR / "matches.parquet")
+    df, seq, mask = build_frame(df)
 
     FEATURES_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(FEATURES_PARQUET, index=False)
     np.save(SEQ_NPY, seq)
     np.save(SEQ_MASK_NPY, mask)
     return df
+
+
+def build_forward(fixtures: pd.DataFrame | None = None, verbose: bool = True) -> tuple:
+    """Features for the corpus PLUS a horizon of unplayed fixtures.
+
+    Not cached. The horizon changes every run, and a stale forward feature
+    table is worse than no table -- it would predict last week's fixtures while
+    looking entirely healthy.
+
+    The unplayed rows are scored from history and absorbed into nothing (see
+    src/features/horizon.py), and they sort after every played row because
+    their kickoffs are in the future. Together those two facts mean appending a
+    horizon cannot change any completed row's features, which
+    tests/test_forward.py asserts bit-for-bit rather than trusting.
+    """
+    from src.data.fixtures import FIXTURES_PARQUET, load_fixtures
+    from src.features.horizon import UNPLAYED_COL
+
+    if fixtures is None:
+        fixtures = (pd.read_parquet(FIXTURES_PARQUET)
+                    if FIXTURES_PARQUET.exists() else load_fixtures())
+
+    corpus = pd.read_parquet(OUT_DIR / "matches.parquet")
+    corpus[UNPLAYED_COL] = False
+
+    # The feed retains fixtures that have already been played, so a horizon row
+    # can collide with a corpus row for the same match. The kickoff filter in
+    # load_fixtures normally prevents it; this catches the case where a result
+    # has landed since the snapshot was taken. A duplicate would enter history
+    # twice -- once as a real match and once as a fixture absorbed into nothing.
+    dupes = fixtures["match_id"].isin(corpus["match_id"])
+    if dupes.any():
+        if verbose:
+            print(f"  dropping {int(dupes.sum())} horizon fixtures already in the corpus")
+        fixtures = fixtures[~dupes].copy()
+
+    combined = pd.concat([corpus, fixtures], ignore_index=True)
+    combined[UNPLAYED_COL] = combined[UNPLAYED_COL].fillna(False).astype(bool)
+    # Concatenating an int16 score column onto a nullable one lands in object
+    # dtype, where `int(value)` meets pd.NA. Float carries the missing scores
+    # as NaN, which every builder already expects.
+    for c in ("fthg", "ftag"):
+        combined[c] = pd.to_numeric(combined[c], errors="coerce").astype("float64")
+
+    if verbose:
+        print(f"  corpus {len(corpus):,} + horizon {len(fixtures)} matches")
+    return build_frame(combined, verbose=verbose)
 
 
 def load_sequences() -> tuple:

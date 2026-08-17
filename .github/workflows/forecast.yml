@@ -1,0 +1,100 @@
+name: forward forecast
+
+# Predict upcoming fixtures, commit the file before kickoff, grade what has
+# settled. The commit timestamp is the evidence, which is the whole reason this
+# runs here rather than on a laptop.
+#
+# CADENCE. football-data's fixtures.csv is a ROLLING ~4-DAY WINDOW, not a season
+# fixture list, and it is collected Friday <=17:00 UK for the weekend and
+# Tuesday <=13:00 UK for midweek. So the schedule has to satisfy two things at
+# once: fire after each upload, and never leave a gap longer than the window.
+# Tuesday + Friday tiles it exactly. A weekly run, or a Thursday/Saturday pair,
+# leaves a five-day gap in which fixtures are silently never predicted.
+#
+# DST. Cron here is UTC only, while both upload deadlines are UK local, so a
+# fixed UTC time drifts an hour across the BST boundary. These two are after the
+# upload in BOTH regimes and still comfortably before a 19:45 UK kickoff:
+#   13:15 UTC Tue = 14:15 BST / 13:15 GMT   (both after the 13:00 UK upload)
+#   17:15 UTC Fri = 18:15 BST / 17:15 GMT   (both after the 17:00 UK upload)
+
+on:
+  schedule:
+    - cron: "15 13 * * 2"
+    - cron: "15 17 * * 5"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never let two runs race for the same commit.
+concurrency:
+  group: forecast
+  cancel-in-progress: false
+
+jobs:
+  forecast:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: uv sync
+
+      # data/ is gitignored, so a cold runner would fetch ~764 files. The cache
+      # key is date-stamped with restore-keys as the fallback: a static key is
+      # never re-saved, so the current-season files deleted by the refresh would
+      # be re-fetched on every single run.
+      - name: Cache date
+        id: cachedate
+        run: echo "today=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache raw football-data CSVs
+        uses: actions/cache@v4
+        with:
+          path: data/raw/footballdata
+          key: footballdata-raw-${{ steps.cachedate.outputs.today }}
+          restore-keys: |
+            footballdata-raw-
+
+      # Re-fetches the current season and purges its keys from _missing.json,
+      # which download_all cannot do. Fails loudly if the file count drops.
+      - name: Refresh corpus
+        run: uv run python -m src.refresh
+
+      - name: Tests
+        run: uv run pytest -q
+
+      # A fresh runner has no SportMonks cache and no .env, so test_players,
+      # test_tier2 and test_sportmonks_parse skip BY DESIGN -- the forward path
+      # needs no credentials. Do not "fix" those skips.
+      #
+      # What must not skip is the four checks CLAUDE.md names as the reason any
+      # number here is trustworthy. Without this step a runner with no corpus
+      # skips all of them and reports green, which is worse than having no CI.
+      - name: Assert the harness self-tests actually ran
+        run: uv run python scripts/assert_selftests_ran.py
+
+      - name: Predict upcoming fixtures
+        run: uv run python -m src.forward --no-refresh
+
+      - name: Grade what has settled
+        run: uv run python -m src.grade
+
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add predictions docs/FORWARD_LEDGER.md
+          if git diff --cached --quiet; then
+            echo "nothing new to commit (no fixtures in the window, or none settled)"
+            exit 0
+          fi
+          git commit -m "Forward run $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push

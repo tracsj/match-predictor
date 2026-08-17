@@ -172,6 +172,49 @@ def download_all(pause: float = 0.15, session: requests.Session | None = None) -
     return rep
 
 
+def current_season_code(today: pd.Timestamp | None = None) -> str:
+    """football-data's season code for the season now under way, e.g. '2627'.
+
+    July belongs to the new season: the cached 2026/27 Scottish Premiership
+    file opens on 31/07/2026.
+    """
+    ts = pd.Timestamp.today() if today is None else pd.Timestamp(today)
+    start = ts.year if ts.month >= 7 else ts.year - 1
+    return f"{start % 100:02d}{(start + 1) % 100:02d}"
+
+
+def refresh_current(session: requests.Session | None = None, pause: float = 0.15,
+                    today: pd.Timestamp | None = None) -> FetchReport:
+    """Re-fetch the current season's files and every extra-country file.
+
+    `download_all` is a cold-start tool and cannot do this. It skips any path
+    that already exists and any key memoised in `_missing.json`, with no mtime
+    check and no force flag, so on a warm cache the current-season file is
+    fetched exactly once and never updated again. A scheduled job relying on it
+    would go on predicting forever while no new result ever landed.
+
+    Both caches have to be cleared, and the second one is the trap. Eight of
+    the 2026/27 divisions were already memoised missing on 2026-08-17 --
+    D1, E1, E2, F1, G1, I1, I2, T1 -- because their files 404 upstream until
+    the season starts, while `fixtures.csv` was already carrying E1 and E2
+    fixtures. Deleting the files alone leaves those keys in place, and those
+    divisions' results never arrive: nothing errors, and the ledger simply
+    reports nothing for a third of the corpus.
+    """
+    code = current_season_code(today)
+    missing = _load_missing()
+    for div in MAIN_DIVISIONS:
+        (RAW_DIR / "main" / f"{code}_{div}.csv").unlink(missing_ok=True)
+        missing.discard(f"main/{code}/{div}")
+    for country in EXTRA_COUNTRIES:
+        # One file per country spanning every season, so it is stale the moment
+        # a result lands anywhere in it.
+        (RAW_DIR / "extra" / f"{country}.csv").unlink(missing_ok=True)
+        missing.discard(f"extra/{country}")
+    _save_missing(missing)
+    return download_all(pause=pause, session=session)
+
+
 # --------------------------------------------------------------------------
 # Parse
 # --------------------------------------------------------------------------
@@ -197,6 +240,12 @@ MAIN_ODDS = {
     "PH": "psh", "PD": "psd", "PA": "psa",          # older alias for Pinnacle
     "MaxH": "maxh", "MaxD": "maxd", "MaxA": "maxa",
     "AvgH": "avgh", "AvgD": "avgd", "AvgA": "avga",
+    # Betfair Exchange pre-close. Added 2026-08-17, and it is load-bearing
+    # rather than tidy-up: football-data dropped Pinnacle entirely in 2026/27
+    # (the PS*/P* columns are absent from the schema, not empty), so the
+    # exchange is now the sharpest price available on both legs. These columns
+    # were in the feed all along and were being parsed away.
+    "BFEH": "bfeh", "BFED": "bfed", "BFEA": "bfea",
     # closing 1X2  <- the ones that matter
     "B365CH": "b365ch", "B365CD": "b365cd", "B365CA": "b365ca",
     "PSCH": "psch", "PSCD": "pscd", "PSCA": "psca",

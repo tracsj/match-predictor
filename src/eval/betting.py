@@ -38,7 +38,8 @@ __all__ = [
     "bootstrap_ci", "random_bet_null", "required_sample_size",
     "PINNACLE_CLOSE", "B365_CLOSE", "MARKET_MAX_CLOSE", "DEFAULT_PRICES",
     "PINNACLE_PRE", "B365_PRE", "MARKET_MAX_PRE", "MARKET_AVG_PRE",
-    "closing_price_for_bets", "CLOSE_FOR",
+    "EXCHANGE_CLOSE", "EXCHANGE_PRE", "MARKET_AVG_CLOSE", "FORWARD_PRICES",
+    "closing_price_for_bets", "CLOSE_FOR", "CLOSE_FOR_EXCHANGE",
 ]
 
 
@@ -81,8 +82,46 @@ B365_PRE = PriceSet("b365_pre", "b365h", "b365d", "b365a")
 MARKET_MAX_PRE = PriceSet("market_max_pre", "maxh", "maxd", "maxa")
 MARKET_AVG_PRE = PriceSet("market_avg_pre", "avgh", "avgd", "avga")
 
+# ---- the forward ladder ----
+#
+# football-data dropped Pinnacle entirely in 2026/27: PS*/P* are absent from
+# the schema rather than empty, and the last populated `psch` anywhere in the
+# corpus is 2026-01-14 (measured 2026-08-17, see docs/research/00-measured-facts.md).
+# So nothing forward-looking can lead with Pinnacle, and the standing rule to
+# lead the sharpest price needs a different sharpest price.
+#
+# The Betfair Exchange is that price, and it is in the feed on both legs:
+# BFEH/BFED/BFEA pre-close in fixtures.csv, BFEC* closing in the results files.
+# It carries the property H4 already values -- the exchange does not ban
+# winners -- so a price recorded here is one that could actually be taken.
+#
+# THIS IS NOT A DOWNGRADE, which is the intuitive assumption and is wrong.
+# Measured 2026-08-17 on the 16,875 matches carrying both closes:
+#
+#     book              mean overround   de-vigged RPS (Shin)
+#     pinnacle close        1.0389           0.20408
+#     exchange close        1.0089           0.20404
+#
+# Equally accurate on a quarter of the margin, with prices 3.9% longer. Beating
+# the exchange close is therefore at least as hard as beating Pinnacle's.
+#
+# Exchange coverage begins in 2024/25, so this substitution works forward and
+# not backward: anything testing the 2012/13-2024/25 panel still needs Pinnacle.
+#
+# ROI simulated at a raw exchange price is PRE-COMMISSION and overstates
+# returns -- 2-5% of net winnings would absorb most of that 3.9%. CLV is immune,
+# because both legs are exchange prices and commission cancels in the ratio.
+# Anything reporting exchange ROI must say which of the two it is showing.
+EXCHANGE_CLOSE = PriceSet("exchange_close", "bfech", "bfecd", "bfeca", sharp=True)
+EXCHANGE_PRE = PriceSet("exchange_pre", "bfeh", "bfed", "bfea", sharp=True)
+MARKET_AVG_CLOSE = PriceSet("market_avg_close", "avgch", "avgcd", "avgca")
+
+# Three columns, led by the sharpest, for anything graded after Pinnacle's exit.
+FORWARD_PRICES = (EXCHANGE_CLOSE, B365_CLOSE, MARKET_MAX_CLOSE)
+
 # Which closing column grades which selection, for CLV.
 CLOSE_FOR = {"H": "psch", "D": "pscd", "A": "psca"}
+CLOSE_FOR_EXCHANGE = {"H": "bfech", "D": "bfecd", "A": "bfeca"}
 
 
 def closing_price_for_bets(bets: pd.DataFrame, df: pd.DataFrame,
