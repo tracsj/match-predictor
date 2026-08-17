@@ -190,6 +190,19 @@ def test_current_season_code_matches_season_of():
     assert current_season_code(pd.Timestamp("2026-06-30")) == "2526"
 
 
+def test_saving_the_missing_manifest_creates_its_directory(tmp_path, monkeypatch):
+    """Cold-start regression. refresh_current() writes _missing.json before
+    download_all() creates the tree, and data/ is gitignored -- so on every CI
+    run this raised FileNotFoundError before a single request went out. Found by
+    a real runner, not locally, because the directory always exists here."""
+    import src.data.footballdata as fd
+
+    monkeypatch.setattr(fd, "RAW_DIR", tmp_path / "does" / "not" / "exist")
+    fd._save_missing({"main/2627/E1"})
+    assert (tmp_path / "does" / "not" / "exist" / "_missing.json").exists()
+    assert fd._load_missing() == {"main/2627/E1"}
+
+
 @needs_data
 def test_fixture_match_id_matches_the_corpus_formula():
     """The join key is what makes a committed prediction gradeable later. A

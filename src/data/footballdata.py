@@ -112,6 +112,11 @@ def _load_missing() -> set[str]:
 
 
 def _save_missing(missing: set[str]) -> None:
+    # mkdir here rather than relying on the caller: refresh_current() writes the
+    # manifest BEFORE download_all() gets a chance to create the tree, so on a
+    # cold checkout -- which is every CI run, since data/ is gitignored -- this
+    # was a FileNotFoundError before the first request went out.
+    _manifest_path().parent.mkdir(parents=True, exist_ok=True)
     _manifest_path().write_text(json.dumps(sorted(missing), indent=0))
 
 
@@ -202,6 +207,9 @@ def refresh_current(session: requests.Session | None = None, pause: float = 0.15
     reports nothing for a third of the corpus.
     """
     code = current_season_code(today)
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
+    (RAW_DIR / "main").mkdir(exist_ok=True)
+    (RAW_DIR / "extra").mkdir(exist_ok=True)
     missing = _load_missing()
     for div in MAIN_DIVISIONS:
         (RAW_DIR / "main" / f"{code}_{div}.csv").unlink(missing_ok=True)

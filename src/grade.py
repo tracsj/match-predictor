@@ -289,6 +289,11 @@ def build_report(verbose: bool = True) -> str:
         sub = settled[m].reset_index(drop=True)
         bets = simulate(sub, p[m], ps, RULE)
         row = summarize(bets, with_ci=False)
+        # summarize() returns price_set="" for an empty frame, by design, so the
+        # label has to be set here. Losing it matters most in exactly the case it
+        # goes missing: a zero-bet row is usually the SHARPEST price, and an
+        # unlabelled blank line is the easiest row in the table to skim past.
+        row["price_set"] = ps.label
         row["note"] = note
         row["n_eligible"] = int(m.sum())
         if len(bets) >= 20:

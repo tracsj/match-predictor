@@ -43,11 +43,11 @@ jobs:
       # file committed in an earlier run has no history, so file_committed_at
       # returns None, every prediction reads as "uncommitted", and the ledger
       # grades nothing at all -- silently, and while reporting success.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v10
         with:
           enable-cache: true
 
@@ -63,7 +63,7 @@ jobs:
         run: echo "today=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
 
       - name: Cache raw football-data CSVs
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: data/raw/footballdata
           key: footballdata-raw-${{ steps.cachedate.outputs.today }}
