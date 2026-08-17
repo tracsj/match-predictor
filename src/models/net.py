@@ -47,8 +47,8 @@ import torch.nn.functional as F
 
 from src.eval.metrics import OUTCOMES
 
-__all__ = ["NetConfig", "MatchNet", "Vocab", "build_vocab", "train_net",
-           "predict", "TemperatureScaler", "poisson_to_hda"]
+__all__ = ["NetConfig", "MatchNet", "SquadEncoder", "Vocab", "build_vocab",
+           "train_net", "predict", "TemperatureScaler", "poisson_to_hda"]
 
 
 # --------------------------------------------------------------------------
@@ -149,11 +149,51 @@ class NetConfig:
     # 64 units is worse than 32, which is the same overfitting pattern as the
     # embeddings and the wide trunk. 32 is the measured optimum, not a guess.
     seq_hidden: int = 32
+    # Deep-Sets encoder over the starting XI. 0 disables it. Off by default
+    # because it only exists for the two SportMonks leagues; the tier-2
+    # experiment turns it on.
+    squad_hidden: int = 0
+
+
+class SquadEncoder(nn.Module):
+    """Deep Sets over a starting XI: shared per-player MLP, then masked pooling.
+
+    Permutation invariance is the whole requirement. A squad is a SET -- the
+    order players appear in a lineup feed carries no information about the
+    team, so an encoder that could read the order would learn the feed's
+    conventions rather than the football. Sum, mean and max pooling are
+    invariant by construction, which is why this is Deep Sets rather than
+    anything that flattens the player axis.
+
+    Mean and max are both kept: mean carries "how good is this team on
+    average", max carries "does it contain a superstar", and those are
+    different questions a squad vector should be able to answer.
+    """
+
+    def __init__(self, n_features: int, hidden: int):
+        super().__init__()
+        self.phi = nn.Sequential(
+            nn.Linear(n_features, hidden), nn.GELU(),
+            nn.Linear(hidden, hidden), nn.GELU(),
+        )
+        self.out_dim = 4 * hidden      # (mean + max) x (home + away)
+
+    def forward(self, squads, mask):
+        # squads (b, 2, S, F); mask (b, 2, S)
+        h = self.phi(squads)                                  # (b, 2, S, H)
+        m = mask.unsqueeze(-1).to(h.dtype)
+        counts = m.sum(dim=2).clamp(min=1.0)
+        pooled_mean = (h * m).sum(dim=2) / counts             # (b, 2, H)
+        # -inf on masked slots so an empty slot can never win the max. A zero
+        # fill would make "absent player" beat any genuinely negative feature.
+        pooled_max = h.masked_fill(~mask.unsqueeze(-1), float("-inf")).max(dim=2).values
+        pooled_max = torch.nan_to_num(pooled_max, neginf=0.0)
+        return torch.cat([pooled_mean, pooled_max], dim=-1).flatten(1)
 
 
 class MatchNet(nn.Module):
     def __init__(self, n_cont: int, vocab: Vocab, cfg: NetConfig,
-                 n_seq_features: int = 0):
+                 n_seq_features: int = 0, n_squad_features: int = 0):
         super().__init__()
         self.cfg = cfg
         torch.manual_seed(cfg.seed)
@@ -170,9 +210,14 @@ class MatchNet(nn.Module):
                 with torch.no_grad():
                     emb.weight[0].zero_()
 
+        self.squad_enc = (SquadEncoder(n_squad_features, cfg.squad_hidden)
+                          if cfg.squad_hidden > 0 else None)
+
         d_in = n_cont + 2 * cfg.team_dim + cfg.league_dim
         if cfg.seq_hidden > 0:
             d_in += 2 * cfg.seq_hidden          # one final state per side
+        if self.squad_enc is not None:
+            d_in += self.squad_enc.out_dim
         k, h = cfg.members, cfg.hidden
 
         # k parallel two-layer MLPs, expressed as batched weights so the whole
@@ -202,7 +247,8 @@ class MatchNet(nn.Module):
         _, h_n = self.gru(flat)
         return h_n[-1].reshape(b, sides * self.cfg.seq_hidden)
 
-    def trunk(self, x_cont, home_id, away_id, league_id, seq=None) -> torch.Tensor:
+    def trunk(self, x_cont, home_id, away_id, league_id, seq=None,
+              squads=None, squad_mask=None) -> torch.Tensor:
         parts = [x_cont]
         if self.team_emb is not None:
             parts += [self.team_emb(home_id), self.team_emb(away_id)]
@@ -212,6 +258,10 @@ class MatchNet(nn.Module):
             if seq is None:
                 raise ValueError("seq_hidden > 0 but no sequence tensor was passed")
             parts.append(self.encode_sequences(seq))
+        if self.squad_enc is not None:
+            if squads is None or squad_mask is None:
+                raise ValueError("squad_hidden > 0 but no squad tensor was passed")
+            parts.append(self.squad_enc(squads, squad_mask))
         x = torch.cat(parts, dim=-1)
         # (batch, d_in) -> (batch, k, h)
         z = torch.einsum("bd,kdh->bkh", x, self.w1) + self.b1
@@ -219,8 +269,9 @@ class MatchNet(nn.Module):
         z = torch.einsum("bkh,khg->bkg", z, self.w2) + self.b2
         return self.drop(F.gelu(z))
 
-    def forward(self, x_cont, home_id, away_id, league_id, seq=None):
-        z = self.trunk(x_cont, home_id, away_id, league_id, seq)
+    def forward(self, x_cont, home_id, away_id, league_id, seq=None,
+                squads=None, squad_mask=None):
+        z = self.trunk(x_cont, home_id, away_id, league_id, seq, squads, squad_mask)
         logits = self.head_hda(z).mean(dim=1)            # average the ensemble
         # Softplus keeps the rate positive; the offset centres it near a
         # realistic 1.35 goals rather than starting the model at zero.
@@ -276,6 +327,9 @@ def train_net(
     device: str = "cpu",
     verbose: bool = False,
     seq_train: np.ndarray | None = None,
+    squads_train: np.ndarray | None = None,
+    squad_mask_train: np.ndarray | None = None,
+    init_from: "MatchNet | None" = None,
 ) -> tuple[MatchNet, dict]:
     """Hand-written training loop, deliberately readable.
 
@@ -307,7 +361,30 @@ def train_net(
     seq_t = (torch.tensor(seq_train, dtype=torch.float32, device=device)
              if cfg.seq_hidden > 0 else None)
 
-    model = MatchNet(X_train.shape[1], vocab, cfg, n_seq_features=n_seq_f).to(device)
+    n_squad_f = 0 if squads_train is None else squads_train.shape[-1]
+    if cfg.squad_hidden > 0 and squads_train is None:
+        raise ValueError("cfg.squad_hidden > 0 requires squads_train")
+    squad_t = (torch.tensor(squads_train, dtype=torch.float32, device=device)
+               if cfg.squad_hidden > 0 else None)
+    squad_m = (torch.tensor(squad_mask_train, dtype=torch.bool, device=device)
+               if cfg.squad_hidden > 0 else None)
+
+    model = MatchNet(X_train.shape[1], vocab, cfg, n_seq_features=n_seq_f,
+                     n_squad_features=n_squad_f).to(device)
+
+    if init_from is not None:
+        # Warm-start from a tier-1 pretrained model. Only the parameters whose
+        # shapes still match are copied -- the trunk's first layer changes
+        # width when a squad encoder is bolted on, so it is reinitialised while
+        # everything downstream of it carries over. Both arms of the tier-2 A/B
+        # start from the same pretrained weights, or the comparison would be
+        # about small-data optimisation rather than about players.
+        src = init_from.state_dict()
+        dst = model.state_dict()
+        carried = {k: v for k, v in src.items()
+                   if k in dst and dst[k].shape == v.shape}
+        dst.update(carried)
+        model.load_state_dict(dst)
 
     emb_params = [p for emb in (model.team_emb, model.league_emb)
                   if emb is not None for p in emb.parameters()]
@@ -320,7 +397,9 @@ def train_net(
 
     def losses(idx):
         sq = None if seq_t is None else seq_t[idx]
-        logits, rates = model(xc[idx], hid[idx], aid[idx], lid[idx], sq)
+        sqd = None if squad_t is None else squad_t[idx]
+        sqm = None if squad_m is None else squad_m[idx]
+        logits, rates = model(xc[idx], hid[idx], aid[idx], lid[idx], sq, sqd, sqm)
         ce = F.cross_entropy(logits, y[idx])
         if cfg.goal_loss_weight > 0:
             pois = (F.poisson_nll_loss(rates[:, 0], gh[idx], log_input=False, full=False)
@@ -363,6 +442,7 @@ def train_net(
     model.eval()
 
     meta = {"mu": mu, "sd": sd, "best_epoch": best["epoch"],
+            "warm_started": init_from is not None,
             "best_val_ce": best["val"], "epochs_run": len(history),
             "history": history}
     if verbose:
@@ -373,14 +453,20 @@ def train_net(
 
 @torch.no_grad()
 def predict(model: MatchNet, df: pd.DataFrame, X: np.ndarray, vocab: Vocab,
-            meta: dict, device: str = "cpu", seq: np.ndarray | None = None) -> dict:
+            meta: dict, device: str = "cpu", seq: np.ndarray | None = None,
+            squads: np.ndarray | None = None,
+            squad_mask: np.ndarray | None = None) -> dict:
     """Returns the softmax 1X2, the Poisson-implied 1X2, and the goal rates."""
     Xs = np.nan_to_num((X - meta["mu"]) / meta["sd"])
     xc, hid, aid, lid = _tensors(df, Xs, vocab, device)
     sq = (torch.tensor(seq, dtype=torch.float32, device=device)
           if model.cfg.seq_hidden > 0 else None)
+    sqd = (torch.tensor(squads, dtype=torch.float32, device=device)
+           if model.cfg.squad_hidden > 0 else None)
+    sqm = (torch.tensor(squad_mask, dtype=torch.bool, device=device)
+           if model.cfg.squad_hidden > 0 else None)
     model.eval()
-    logits, rates = model(xc, hid, aid, lid, sq)
+    logits, rates = model(xc, hid, aid, lid, sq, sqd, sqm)
     p = torch.softmax(logits, dim=-1).cpu().numpy()
     r = rates.cpu().numpy()
     return {"hda": p / p.sum(axis=1, keepdims=True),
