@@ -47,7 +47,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: astral-sh/setup-uv@v10
+      # Pinned exactly, not to a major tag: astral-sh/setup-uv publishes major
+      # tags only up to v7 while its current release is v10.0.1, so `@v10` does
+      # not resolve. checkout and cache do maintain theirs.
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
 
