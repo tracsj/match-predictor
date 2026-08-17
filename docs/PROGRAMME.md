@@ -17,9 +17,29 @@
 
 **The finding that changed the programme.** **football-data dropped Pinnacle entirely in 2026/27** — the columns are absent from the schema, not empty, and the last populated `psch` anywhere is 2026-01-14. The replacement is the **Betfair Exchange close**, and measuring the two on the 16,875 matches carrying both showed it is **not a downgrade**: equally accurate (de-vigged RPS 0.20404 vs 0.20408) on a quarter of the margin (overround 1.0089 vs 1.0389), with prices 3.9% longer. Beating it is at least as hard. Full detail and the commands in `docs/research/00-measured-facts.md`.
 
+**The workflow is live and verified on a real runner.** Repo is `tracsj/match-predictor`, **private**, default branch `master`. Run `32068718466` went green end to end on 2026-08-17 and committed `docs/FORWARD_LEDGER.md` by itself. Measured, cold cache:
+
+| step | cold | note |
+|---|---|---|
+| setup + `uv sync` | ~40s | |
+| **refresh** | **271s** | 724 files, **0 errors** — football-data does not block runner IPs, which was a real open risk. Warm cache re-fetches only ~38 files |
+| 302 tests | ~110s | green on a fresh runner |
+| self-test guard | ~2s | the four checks genuinely ran on CI |
+| predict | 3s | *no fixtures in the window* — this run did not exercise training |
+| grade + commit | ~7s | pushed on its own |
+| **total** | **8m14s** | |
+
+The CI corpus reproduced local exactly: 296,218 matches, 2026-27 at 253 matches across 18 divisions. **Training on a runner is still unmeasured**, since the horizon was empty — 4m locally, so budget 12–20 min against the 120-minute timeout.
+
+**Four bugs only a real runner would have found**, all of which failed silently or would have:
+1. `refresh_current()` wrote `_missing.json` before the directory existed — `data/` is gitignored, so every checkout starts empty.
+2. `--no-refresh` disabled the *fixtures* fetch as well as the corpus one, and `src.refresh` never fetches `fixtures.csv`.
+3. `actions/checkout` defaults to a **depth-1 shallow clone**, on which `git log` finds nothing, so every prediction would have read as "uncommitted" and the ledger would have graded **nothing while exiting zero**. `fetch-depth: 0` is mandatory; the grader now refuses on a shallow clone.
+4. `astral-sh/setup-uv` publishes major tags only to `v7` while its release is `v10.0.1`, so `@v10` does not resolve. Pinned exactly.
+
 **Next, in order**
 
-1. **Watch the first two scheduled runs.** The path has never fired on a GitHub runner. Training wall-time on 2 vCPUs is unmeasured — 4m locally, so budget 12–20 min, and the workflow allows 120.
+1. **Watch the first scheduled run, Tuesday 13:15 UTC.** It is the first with a non-empty horizon, so it is the first to exercise training and to write an actual prediction file.
 2. **H1 pre-registered, then run.** Zero new data, capped at 2024/25. Its file names the three things still open, chiefly the single pre-specified tier contrast rather than a five-way search.
 3. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
 4. **H3 in its free form**, which is cheaper than the status board previously said — see the correction below.
