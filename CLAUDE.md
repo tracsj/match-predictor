@@ -24,6 +24,7 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 | `docs/PREREG_PHASE6_NULL.md` | the pre-registered re-analysis of Phase 6's CLV against a measured null, its reproduction gate, and the result that withdrew the "wrong side of the market" reading |
 | `docs/FORWARD_LEDGER.md` | the forward record — predictions committed before kickoff, graded as results land. Rewritten from `predictions/*.csv` on every run, never appended |
 | `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting — **plus a 2026-08-17 correction withdrawing its "wrong side of the market" reading**, with the superseded passages marked in place rather than rewritten |
+| `docs/H3_RESULT.md` | H3's result: line movement **is** forecastable (+4.27pp over a matched null) and buys nothing — the gain is −0.15% of price against a 5.08% margin, and it does not beat a match model's incidental signal |
 | `docs/H1_RESULT.md` | H1's result and its diagnostics: the tier-stratified CLV tables, the **measured CLV null** and the overround-tightening mechanism behind it, the per-tier margins over each tier's own drift, the control arms (anti-model, ordered logit, random-in-band), and the 2025-26 out-of-sample check |
 | `docs/TIER2_RESULT.md` | what a starting XI is worth (nothing measurable), and the SportMonks upgrade recommendation |
 | `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it — including **Pinnacle's removal in 2026/27** and the exchange-vs-Pinnacle benchmark measurement, what `fixtures.csv` holds, and why `download_all` cannot refresh |
@@ -53,7 +54,7 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 
 ## Verification that must keep passing
 
-The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — **302 tests** (2026-08-17).
+The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — **321 tests** (2026-08-17).
 
 **All five skip silently when `data/processed/matches.parquet` is absent**, which is the default on a fresh runner, and pytest then reports green. `uv run python scripts/assert_selftests_ran.py` asserts the five checks below actually ran; the workflow calls it after the suite. A green build without that step means nothing.
 
@@ -82,7 +83,7 @@ src/
   models/      baselines (ordered logit, CatBoost, Dixon-Coles), net
                (both heads are inline in net.py — there is no heads.py)
   eval/        devig (Shin), metrics (RPS/log-loss/ECE), split, betting, CLV
-  scoreboard.py  experiments.py  tier2.py  phase6.py  h1.py
+  scoreboard.py  experiments.py  tier2.py  phase6.py  h1.py  h3.py
   refresh.py   re-fetch the current season and rebuild the corpus
   forward.py   predict upcoming fixtures, write predictions/YYYY-MM-DD.csv
   grade.py     grade committed predictions, rewrite docs/FORWARD_LEDGER.md
