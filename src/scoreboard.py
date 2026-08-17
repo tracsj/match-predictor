@@ -29,7 +29,7 @@ from src.eval.betting import (
     summarize,
 )
 from src.eval.devig import devig, overround
-from src.features.ratings import add_ratings
+from src.features import build as feature_build
 from src.models.baselines import CatBoostBaseline, OrderedLogit, RATING_FEATURES
 from src.eval.metrics import OUTCOMES, summary
 from src.eval.split import assert_no_leakage, season_walk_forward
@@ -44,12 +44,10 @@ def load_panel(first: str = "2016-17", last: str = "2024-25") -> pd.DataFrame:
     2025 and is absent from February 2026, so 2025-26 cannot supply the sharp
     benchmark -- see docs/research/00-measured-facts.md.
     """
-    df = pd.read_parquet(OUT_DIR / "matches.parquet")
-    # Ratings are built over the WHOLE corpus in chronological order, before
-    # filtering. Each row's rating still comes only from matches strictly
-    # before it, so this is not leakage -- but restricting first would throw
-    # away the history that makes the ratings meaningful.
-    df = add_ratings(df.sort_values("kickoff").reset_index(drop=True))
+    # Cached feature table: ratings + rolling form, built over the whole
+    # corpus in chronological order and only then filtered. Each row still
+    # sees only matches strictly before it.
+    df = feature_build.load()
     df = df[(df["source"] == "main")
             & df["season"].between(first, last)
             & df[PINNACLE_CLOSE.cols].notna().all(axis=1)]

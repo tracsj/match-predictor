@@ -34,7 +34,8 @@ from scipy.special import expit
 
 from src.eval.metrics import OUTCOMES
 
-__all__ = ["OrderedLogit", "CatBoostBaseline", "DixonColesBaseline", "RATING_FEATURES"]
+__all__ = ["OrderedLogit", "CatBoostBaseline", "DixonColesBaseline",
+           "RATING_FEATURES", "FORM_FEATURES", "ALL_FEATURES"]
 
 # The feature set the literature says carries the signal. Deliberately small:
 # at ~0.1 nats of total learnable signal, more columns mostly buy overfitting.
@@ -43,6 +44,23 @@ RATING_FEATURES = [
     "pi_exp_gd", "pi_home_h", "pi_away_a",
     "elo_home_moved", "elo_away_moved",
 ]
+
+# Rolling form. Both sides, two windows. The opponent-Elo columns are the
+# opposition-strength component: without them "scored a lot" and "played weak
+# defences" are the same number.
+FORM_FEATURES = [
+    f"{side}_{stat}_{w}"
+    for side in ("h", "a")
+    for w in (5, 10)
+    for stat in ("pts", "gf", "ga", "gd", "sot_f", "sot_a", "corners_f",
+                 "opp_elo", "home_share")
+] + ["h_rest_days", "a_rest_days", "h_played", "a_played",
+     "league_goals_avg", "h_days_since_season_start"]
+
+# What the network gets. Deliberately wider than the baseline's, because a net
+# with exactly the baseline's inputs has nothing to find that the baseline has
+# not already found -- which is the first thing this project measured.
+ALL_FEATURES = RATING_FEATURES + FORM_FEATURES
 
 
 def _standardize(fit_x: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

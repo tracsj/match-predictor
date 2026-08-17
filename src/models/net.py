@@ -1,0 +1,368 @@
+"""The network.
+
+A multi-layer net trained by backpropagation on pre-match inputs, with team
+and league embeddings and two heads sharing one trunk.
+
+    inputs                     trunk                      heads
+    ------                     -----                      -----
+    rating features  ----\
+    team_home  -> emb ----+--> [Linear -> GELU -> Drop]   1X2 softmax (3)
+    team_away  -> emb ----+--> [Linear -> GELU -> Drop]   goals: log lambda x2
+    league     -> emb ----/     x k parallel members       -> Poisson grid -> 1X2
+
+**Why embeddings are the point.** A rating compresses a team into one number
+that only moves when results move. An embedding is a learned vector, free to
+encode whatever actually predicts outcomes -- style, volatility, home/away
+asymmetry -- and it is the natural thing a net can do that a gradient-boosted
+tree on ratings cannot. It is also the obvious place to overfit, so the
+embeddings are weight-decayed hard and kept small (8-16d over ~1,300 teams).
+
+**Why parallel members rather than one deep stack.** TabM (Gorishniy et al.,
+ICLR 2025) found that a parameter-efficient implicit ensemble of shallow MLPs
+is the strongest general-purpose tabular neural architecture. At ~50k training
+rows with roughly 0.1 nats of learnable signal, depth buys overfitting and
+ensembling buys stability. Yeung et al.'s transformer beat their LSTM on this
+task mainly by having lower variance, not higher accuracy.
+
+**Why two heads.** 1X2 is what gets bet. The goal head predicts a Poisson rate
+per side, which yields a scoreline grid, over/under and both-teams-to-score
+for free, and an *implied* 1X2 that can be cross-checked against the softmax
+head. Multi-task heads over a shared trunk are well demonstrated in-game
+(Horton & Lucey 2025) and, per the literature sweep, have never been ablated
+pre-match. That ablation is cheap here and worth having.
+
+Everything returns probabilities in (H, D, A) order.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass, field
+
+import numpy as np
+import pandas as pd
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+from src.eval.metrics import OUTCOMES
+
+__all__ = ["NetConfig", "MatchNet", "Vocab", "build_vocab", "train_net",
+           "predict", "TemperatureScaler", "poisson_to_hda"]
+
+
+# --------------------------------------------------------------------------
+# Vocabulary
+# --------------------------------------------------------------------------
+
+@dataclass
+class Vocab:
+    """Stable integer ids for teams and leagues, with index 0 reserved.
+
+    Built from the whole corpus rather than per split. Team identity is known
+    before kickoff, so this carries no information about the result -- it is
+    not the same kind of object as a fitted parameter. Index 0 is <unk> so a
+    team absent at fit time still predicts instead of raising, which is the
+    failure that makes Dixon-Coles awkward in a walk-forward loop.
+    """
+    teams: dict[str, int] = field(default_factory=dict)
+    leagues: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def n_teams(self) -> int:
+        return len(self.teams) + 1
+
+    @property
+    def n_leagues(self) -> int:
+        return len(self.leagues) + 1
+
+    def team_ids(self, country, key) -> np.ndarray:
+        return np.array([self.teams.get(f"{c}|{k}", 0) for c, k in zip(country, key)],
+                        dtype=np.int64)
+
+    def league_ids(self, div) -> np.ndarray:
+        return np.array([self.leagues.get(str(d), 0) for d in div], dtype=np.int64)
+
+
+def build_vocab(df: pd.DataFrame) -> Vocab:
+    keys = pd.unique(pd.concat([
+        df["country"].astype(str) + "|" + df["home_key"].astype(str),
+        df["country"].astype(str) + "|" + df["away_key"].astype(str),
+    ]))
+    divs = pd.unique(df["div"].astype(str))
+    return Vocab(teams={k: i + 1 for i, k in enumerate(sorted(keys))},
+                 leagues={d: i + 1 for i, d in enumerate(sorted(divs))})
+
+
+# --------------------------------------------------------------------------
+# Model
+# --------------------------------------------------------------------------
+
+@dataclass
+class NetConfig:
+    team_dim: int = 12
+    league_dim: int = 6
+    hidden: int = 96
+    members: int = 8            # parallel ensemble members (TabM-style)
+    dropout: float = 0.2
+    lr: float = 3e-3
+    weight_decay: float = 1e-4
+    emb_weight_decay: float = 1e-3   # embeddings overfit first, so decay harder
+    batch_size: int = 1024
+    max_epochs: int = 120
+    patience: int = 10
+    goal_loss_weight: float = 0.3    # 0.0 disables the goals head (for ablation)
+    max_goals: int = 10
+    seed: int = 0
+
+
+class MatchNet(nn.Module):
+    def __init__(self, n_cont: int, vocab: Vocab, cfg: NetConfig):
+        super().__init__()
+        self.cfg = cfg
+        torch.manual_seed(cfg.seed)
+
+        # dim 0 disables an embedding entirely, which is how the ablation
+        # ("do team embeddings earn their place?") is run.
+        self.team_emb = (nn.Embedding(vocab.n_teams, cfg.team_dim, padding_idx=0)
+                         if cfg.team_dim > 0 else None)
+        self.league_emb = (nn.Embedding(vocab.n_leagues, cfg.league_dim, padding_idx=0)
+                           if cfg.league_dim > 0 else None)
+        for emb in (self.team_emb, self.league_emb):
+            if emb is not None:
+                nn.init.normal_(emb.weight, std=0.05)
+                with torch.no_grad():
+                    emb.weight[0].zero_()
+
+        d_in = n_cont + 2 * cfg.team_dim + cfg.league_dim
+        k, h = cfg.members, cfg.hidden
+
+        # k parallel two-layer MLPs, expressed as batched weights so the whole
+        # ensemble runs in two einsums rather than a python loop.
+        self.w1 = nn.Parameter(torch.empty(k, d_in, h))
+        self.b1 = nn.Parameter(torch.zeros(k, h))
+        self.w2 = nn.Parameter(torch.empty(k, h, h))
+        self.b2 = nn.Parameter(torch.zeros(k, h))
+        for w in (self.w1, self.w2):
+            for i in range(k):
+                nn.init.kaiming_uniform_(w[i], a=math.sqrt(5))
+
+        self.drop = nn.Dropout(cfg.dropout)
+        self.head_hda = nn.Linear(h, 3)
+        self.head_goals = nn.Linear(h, 2)
+
+    def trunk(self, x_cont, home_id, away_id, league_id) -> torch.Tensor:
+        parts = [x_cont]
+        if self.team_emb is not None:
+            parts += [self.team_emb(home_id), self.team_emb(away_id)]
+        if self.league_emb is not None:
+            parts.append(self.league_emb(league_id))
+        x = torch.cat(parts, dim=-1)
+        # (batch, d_in) -> (batch, k, h)
+        z = torch.einsum("bd,kdh->bkh", x, self.w1) + self.b1
+        z = self.drop(F.gelu(z))
+        z = torch.einsum("bkh,khg->bkg", z, self.w2) + self.b2
+        return self.drop(F.gelu(z))
+
+    def forward(self, x_cont, home_id, away_id, league_id):
+        z = self.trunk(x_cont, home_id, away_id, league_id)
+        logits = self.head_hda(z).mean(dim=1)            # average the ensemble
+        # Softplus keeps the rate positive; the offset centres it near a
+        # realistic 1.35 goals rather than starting the model at zero.
+        log_rates = self.head_goals(z).mean(dim=1)
+        rates = F.softplus(log_rates) + 1e-4
+        return logits, rates
+
+
+def poisson_to_hda(rates: np.ndarray, max_goals: int = 10) -> np.ndarray:
+    """Turn (lambda_home, lambda_away) into H/D/A by summing a scoreline grid.
+
+    Independent Poisson, which is the classical starting point. Dixon-Coles
+    adds a low-score correlation correction; that is a natural extension once
+    the head is shown to carry its weight.
+    """
+    rates = np.asarray(rates, dtype=float)
+    k = np.arange(max_goals + 1)
+    logfact = np.cumsum(np.concatenate([[0.0], np.log(k[1:])]))
+
+    def pmf(lam):
+        lam = lam[:, None]
+        return np.exp(k * np.log(lam) - lam - logfact)
+
+    ph, pa = pmf(rates[:, 0]), pmf(rates[:, 1])
+    grid = ph[:, :, None] * pa[:, None, :]
+    idx = np.arange(max_goals + 1)
+    home = grid[:, idx[:, None] > idx[None, :]].sum(axis=1)
+    draw = grid[:, idx, idx].sum(axis=1)
+    away = grid[:, idx[:, None] < idx[None, :]].sum(axis=1)
+    out = np.column_stack([home, draw, away])
+    return out / out.sum(axis=1, keepdims=True)
+
+
+# --------------------------------------------------------------------------
+# Training
+# --------------------------------------------------------------------------
+
+def _tensors(df, X, vocab, device):
+    return (
+        torch.tensor(X, dtype=torch.float32, device=device),
+        torch.tensor(vocab.team_ids(df["country"], df["home_key"]), device=device),
+        torch.tensor(vocab.team_ids(df["country"], df["away_key"]), device=device),
+        torch.tensor(vocab.league_ids(df["div"]), device=device),
+    )
+
+
+def train_net(
+    train_df: pd.DataFrame,
+    X_train: np.ndarray,
+    vocab: Vocab,
+    cfg: NetConfig = NetConfig(),
+    val_fraction: float = 0.15,
+    device: str = "cpu",
+    verbose: bool = False,
+) -> tuple[MatchNet, dict]:
+    """Hand-written training loop, deliberately readable.
+
+    The validation split is the LAST `val_fraction` of the training window in
+    time, never a random slice. Early stopping on a random validation set
+    would select the epoch that best predicts the past, which is the same
+    leak the walk-forward splitter exists to prevent -- one level down.
+    """
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+
+    n = len(train_df)
+    cut = int(n * (1 - val_fraction))
+    tr, va = slice(0, cut), slice(cut, n)
+
+    mu = np.nanmean(X_train[tr], axis=0)
+    sd = np.nanstd(X_train[tr], axis=0)
+    sd[sd < 1e-9] = 1.0
+    Xs = np.nan_to_num((X_train - mu) / sd)
+
+    xc, hid, aid, lid = _tensors(train_df, Xs, vocab, device)
+    y = torch.tensor([OUTCOMES.index(v) for v in train_df["result"]], device=device)
+    gh = torch.tensor(train_df["fthg"].to_numpy(), dtype=torch.float32, device=device)
+    ga = torch.tensor(train_df["ftag"].to_numpy(), dtype=torch.float32, device=device)
+
+    model = MatchNet(X_train.shape[1], vocab, cfg).to(device)
+
+    emb_params = [p for emb in (model.team_emb, model.league_emb)
+                  if emb is not None for p in emb.parameters()]
+    emb_ids = {id(p) for p in emb_params}
+    other = [p for p in model.parameters() if id(p) not in emb_ids]
+    groups = [{"params": other, "weight_decay": cfg.weight_decay}]
+    if emb_params:
+        groups.insert(0, {"params": emb_params, "weight_decay": cfg.emb_weight_decay})
+    opt = torch.optim.AdamW(groups, lr=cfg.lr)
+
+    def losses(idx):
+        logits, rates = model(xc[idx], hid[idx], aid[idx], lid[idx])
+        ce = F.cross_entropy(logits, y[idx])
+        if cfg.goal_loss_weight > 0:
+            pois = (F.poisson_nll_loss(rates[:, 0], gh[idx], log_input=False, full=False)
+                    + F.poisson_nll_loss(rates[:, 1], ga[idx], log_input=False, full=False))
+        else:
+            pois = torch.zeros((), device=device)
+        return ce, pois
+
+    tr_idx = torch.arange(cut, device=device)
+    va_idx = torch.arange(cut, n, device=device)
+
+    best = {"val": float("inf"), "epoch": -1, "state": None}
+    history = []
+
+    for epoch in range(cfg.max_epochs):
+        model.train()
+        perm = tr_idx[torch.randperm(len(tr_idx), device=device)]
+        for i in range(0, len(perm), cfg.batch_size):
+            batch = perm[i:i + cfg.batch_size]
+            ce, pois = losses(batch)
+            loss = ce + cfg.goal_loss_weight * pois
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step()
+
+        model.eval()
+        with torch.no_grad():
+            ce, pois = losses(va_idx)
+            val = float(ce)                # select on the 1X2 loss, not the sum
+        history.append({"epoch": epoch, "val_ce": val, "val_poisson": float(pois)})
+
+        if val < best["val"] - 1e-5:
+            best = {"val": val, "epoch": epoch,
+                    "state": {k: v.detach().clone() for k, v in model.state_dict().items()}}
+        elif epoch - best["epoch"] >= cfg.patience:
+            break
+
+    if best["state"] is not None:
+        model.load_state_dict(best["state"])
+    model.eval()
+
+    meta = {"mu": mu, "sd": sd, "best_epoch": best["epoch"],
+            "best_val_ce": best["val"], "epochs_run": len(history),
+            "history": history}
+    if verbose:
+        print(f"  stopped at epoch {len(history)}, best {best['epoch']} "
+              f"(val CE {best['val']:.4f})")
+    return model, meta
+
+
+@torch.no_grad()
+def predict(model: MatchNet, df: pd.DataFrame, X: np.ndarray, vocab: Vocab,
+            meta: dict, device: str = "cpu") -> dict:
+    """Returns the softmax 1X2, the Poisson-implied 1X2, and the goal rates."""
+    Xs = np.nan_to_num((X - meta["mu"]) / meta["sd"])
+    xc, hid, aid, lid = _tensors(df, Xs, vocab, device)
+    model.eval()
+    logits, rates = model(xc, hid, aid, lid)
+    p = torch.softmax(logits, dim=-1).cpu().numpy()
+    r = rates.cpu().numpy()
+    return {"hda": p / p.sum(axis=1, keepdims=True),
+            "goal_rates": r,
+            "hda_from_goals": poisson_to_hda(r, model.cfg.max_goals),
+            "logits": logits.cpu().numpy()}
+
+
+# --------------------------------------------------------------------------
+# Calibration
+# --------------------------------------------------------------------------
+
+class TemperatureScaler:
+    """Single-parameter temperature scaling (Guo et al., 2017).
+
+    Divides the logits by one learned scalar fitted on held-out data. One
+    parameter, preserves the argmax, essentially cannot overfit -- the right
+    default for a net. Isotonic regression is more flexible and needs far more
+    held-out data; a study that moved ROI from ~1% to ~10% on the calibration
+    step alone is the reason this is fitted strictly out of sample.
+    """
+
+    def __init__(self):
+        self.log_t = 0.0
+
+    @property
+    def temperature(self) -> float:
+        return float(np.exp(self.log_t))
+
+    def fit(self, logits: np.ndarray, y) -> "TemperatureScaler":
+        z = torch.tensor(np.asarray(logits), dtype=torch.float32)
+        t = torch.tensor([OUTCOMES.index(str(v).strip().upper()) for v in y])
+        log_t = torch.zeros(1, requires_grad=True)
+        opt = torch.optim.LBFGS([log_t], lr=0.2, max_iter=80)
+
+        def closure():
+            opt.zero_grad()
+            loss = F.cross_entropy(z / torch.exp(log_t), t)
+            loss.backward()
+            return loss
+
+        opt.step(closure)
+        self.log_t = float(log_t.detach())
+        return self
+
+    def transform(self, logits: np.ndarray) -> np.ndarray:
+        z = np.asarray(logits, dtype=float) / self.temperature
+        z = z - z.max(axis=1, keepdims=True)
+        e = np.exp(z)
+        return e / e.sum(axis=1, keepdims=True)
