@@ -23,7 +23,11 @@ Before we close this session:
 
    List every hypothesis, model configuration, feature set, threshold or market variant **evaluated this session**, including ones abandoned after a single look. For each, confirm it appears in `docs/PROGRAMME.md` and that the running count is incremented.
 
-   The risk is not a dishonest entry. It is a configuration tried casually mid-session, found uninteresting, and never written down — which quietly understates the search and inflates whatever eventually survives it. If nothing was evaluated, say so explicitly.
+   The risk is not a dishonest entry. It is a configuration tried casually mid-session, found uninteresting, and never written down — which quietly understates the search and inflates whatever eventually survives it.
+
+   **Most of this step's real work is arguing things DOWN, not up** — three sessions running, so expect it. Dry runs, grading controls, benchmark measurements, null arms and re-slices of a settled result all look exactly like evaluations in a log. **The question that settles every one of them is what the thing was *searching for*.** A control whose result nobody is hoping for cannot widen a search. A re-slice of an existing run by a new dimension is a new cut, not a new configuration. Prices measured without a model fitted are a fact about the market.
+
+   **Never record the outcome as a bare "nothing else was evaluated"** — that is indistinguishable from having skipped the step. Enumerate what was considered and why each does not count, in a table in `docs/PROGRAMME.md`. The 2026-08-17 third session ran **eight** such things beside one real evaluation, and the table naming them is the record that the count of 48 is honest.
 
    Then check: does any hypothesis whose status is `running` now have a result? Move it to `settled` with a link, or to the graveyard.
 

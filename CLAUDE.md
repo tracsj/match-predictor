@@ -4,7 +4,9 @@
 
 A standing programme hunting for exploitable inefficiency in sports betting markets, and a harness honest enough that a positive result would be believable. It began as a football 1X2 predictor; the model is finished and the question has moved on.
 
-**The finished result, so nobody re-derives it.** The network reaches RPS 0.20765 against de-vigged Pinnacle closing odds at 0.20291 — beating every non-neural baseline (t = +2.50), losing to the market (t = +20). The pre-registered betting rule lost in every price column with closing-line value at **0.9952**, meaning its selections sat on the wrong side of the market's own movement. Filtering by model confidence does not rescue it: the deficit is uniform across confidence buckets.
+**The finished result, so nobody re-derives it.** The network reaches RPS 0.20765 against de-vigged Pinnacle closing odds at 0.20291 — beating every non-neural baseline (t = +2.50), losing to the market (t = +20). The pre-registered betting rule lost in every price column, with closing-line value at **0.9952**. Filtering by model confidence does not rescue it: the deficit is uniform across confidence buckets.
+
+⚠️ **That 0.9952 used to be glossed as "its selections sat on the wrong side of the market's own movement", and that gloss is in doubt** (2026-08-17). It compares against a null of 1.0, and the null is not 1.0 — see the CLV rule below. On Phase 6's own population the drift is 0.9904 / 38.89% shortened while it observed 0.9952 / 42.4%, which is the *right* side. The losses are unaffected and the "do not chase 0.2076 with better features" conclusion stands. `docs/PHASE6_RESULT.md` carries the addendum; the re-derivation that would settle it is pre-registered work, not yet done.
 
 **This is the normal outcome, not a defect in the pipeline.** Wilkens (2021) ran 15 ML architectures on ATP tennis and beat no odds-implied forecast; Kovalchik (2016) found the bookmaker consensus beat 11 published models; Data Golf publishes −0.92% ROI for its own model. **Do not treat 0.2076 as a near-miss to be closed with better features.** It is the empirical ceiling for a pre-match model in a liquid top-tier market. New work goes into finding a *different* market, not a better feature.
 
@@ -17,10 +19,11 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 | file | what is in it |
 |---|---|
 | `docs/PROGRAMME.md` | **the handoff** ("Where we are"), plus the hypothesis registry — status board, graveyard, the running count of every configuration ever tested, and the ruling on what does and does not increment it |
-| `docs/hypotheses/*.md` | one file per hypothesis: pre-registration inline, result when settled. H1–H4 exist and are all `proposed` — each names what is still open before it may run |
+| `docs/hypotheses/*.md` | one file per hypothesis: pre-registration inline, result when settled. **H1 is `settled` (supported, then heavily qualified by its diagnostics); H2–H4 are `proposed`** and each names what is still open before it may run |
 | `docs/PREREGISTRATION.md` | the football betting rule, prices and holdout, fixed before any PnL existed |
 | `docs/FORWARD_LEDGER.md` | the forward record — predictions committed before kickoff, graded as results land. Rewritten from `predictions/*.csv` on every run, never appended |
-| `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting |
+| `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting — **plus a 2026-08-17 addendum putting its CLV *interpretation* in doubt** |
+| `docs/H1_RESULT.md` | H1's result and its diagnostics: the tier-stratified CLV tables, the **measured CLV null** and the overround-tightening mechanism behind it, the per-tier margins over each tier's own drift, the control arms (anti-model, ordered logit, random-in-band), and the 2025-26 out-of-sample check |
 | `docs/TIER2_RESULT.md` | what a starting XI is worth (nothing measurable), and the SportMonks upgrade recommendation |
 | `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it — including **Pinnacle's removal in 2026/27** and the exchange-vs-Pinnacle benchmark measurement, what `fixtures.csv` holds, and why `download_all` cannot refresh |
 | `docs/research/01-neural-nets-for-match-prediction.md` | what wins on this task, with RPS numbers tagged to their datasets |
@@ -31,6 +34,9 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 - **Pre-register before running a betting rule.** Threshold, prices, holdout and model config committed *before* any PnL is computed. Searching several rules and reporting the best is how a backtest manufactures an edge — one sweep here already produced a tempting +2.4% cell that was noise on 296 bets.
 - **Increment the registry count for every configuration evaluated**, including the ones that die quietly mid-session. The count is the only thing that keeps a widening search honest.
 - **Report CLV before ROI.** Distinguishing a 2% edge from zero needs ~45,000 bets; CLV converges roughly a hundred times faster and is what correctly said stop.
+- **Never test CLV against a ratio of 1.0 or a 50% shortening rate. Measure the null.** The pre-close and the close are not on average the same price: Pinnacle's overround tightens toward kickoff in every season measured, so prices lengthen by default and a randomly chosen selection inside the rule's odds band shortens only **45–48%** of the time — 31% in 2025-26. Against 50% a real effect reads as nothing and a null tier reads as a contradiction; both happened here in one session and both were recorded before being caught. Match the null's odds distribution to the model's own bets (`scripts/h1_odds_matched_null.py`) — though matched and unmatched agreed to within 0.002, so the mix is not usually the driver. Both pre-registrations in this repo were written against the wrong null.
+- **Commit a pre-registered result before running a single control.** Controls run first stop being controls: they become the reasons you hesitated to write the result down, and a surprising result is exactly when that hesitation feels most like rigour. Record the tables, then diagnose in a separate section — and when a control later overturns a reading, **correct it in the diagnostics rather than editing the recorded table.** Done both ways in one session on 2026-08-17: the H1 tables were committed at `4bc56bc` before any control ran, and three of their readings were later corrected in place below them.
+
 - **Lead the sharpest price.** Three columns always: the sharpest close, one book you could actually hold an account with, market maximum. A result positive only in the third is an odds-comparison screen. **Which price is sharpest depends on the era** — Pinnacle close through 2024/25, **Betfair Exchange close from 2024/25 onward**, because football-data removed Pinnacle in 2026/27. The exchange is not a softer benchmark: equally accurate on a quarter of the margin, measured on 16,875 matches carrying both.
 - **Report exchange ROI as pre- or post-commission, explicitly.** 2–5% of net winnings is real money and the difference is larger than most claimed edges. CLV is immune when both legs are exchange prices.
 - **Build every feature in one forward chronological pass**, reading history before appending the current match. A per-entity `groupby` then `.tail(n)` looks reasonable and silently includes the future.
@@ -47,9 +53,9 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 
 ## Verification that must keep passing
 
-The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — 299 tests.
+The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — **302 tests** (2026-08-17).
 
-**They all skip silently when `data/processed/matches.parquet` is absent**, which is the default on a fresh runner, and pytest then reports green. `uv run python scripts/assert_selftests_ran.py` asserts the four below actually ran; the workflow calls it after the suite. A green build without that step means nothing.
+**All five skip silently when `data/processed/matches.parquet` is absent**, which is the default on a fresh runner, and pytest then reports green. `uv run python scripts/assert_selftests_ran.py` asserts the five checks below actually ran; the workflow calls it after the suite. A green build without that step means nothing.
 
 - A **result-peeking cheater** must score RPS < 0.01 and be flagged.
 - A **deliberately poisoned split** must raise from `assert_no_leakage`.
@@ -76,11 +82,14 @@ src/
   models/      baselines (ordered logit, CatBoost, Dixon-Coles), net
                (both heads are inline in net.py — there is no heads.py)
   eval/        devig (Shin), metrics (RPS/log-loss/ECE), split, betting, CLV
-  scoreboard.py  experiments.py  tier2.py  phase6.py
+  scoreboard.py  experiments.py  tier2.py  phase6.py  h1.py
   refresh.py   re-fetch the current season and rebuild the corpus
   forward.py   predict upcoming fixtures, write predictions/YYYY-MM-DD.csv
   grade.py     grade committed predictions, rewrite docs/FORWARD_LEDGER.md
-scripts/       assert_selftests_ran.py — the four self-tests must RUN, not skip
+scripts/       assert_selftests_ran.py — the five self-tests must RUN, not skip
+               h1_*.py, clv_null_calibration.py — H1's coverage probe and its
+               post-hoc controls. Each says in its docstring whether it is a
+               control (no registry count) or an evaluation
 predictions/   committed forward predictions. NOT gitignored; the commit is the
                evidence, so never rewrite or backfill a file here.
 v1/            the original build, frozen. Its betting numbers are unreliable —
@@ -98,6 +107,7 @@ v1/            the original build, frozen. Its betting numbers are unreliable �
 
 ## Data boundaries that bite
 
+- **The exchange has no historical PRE-close.** `bfeh/bfed/bfea` are **absent from the results files entirely** — they arrive only through `fixtures.csv`, going forward. `bfec*` (the close) is there from 2024/25. So the exchange can grade forward CLV and **cannot grade a backward-looking one at all**; `psh → psch` is the only historical ladder that exists, and it ends in January 2026. Measured with `scripts/h1_holdout_coverage.py`.
 - **Pinnacle is gone.** Closing odds run 2012/13 → **2026-01-14**, decaying from October 2025, and the columns are **absent from the 2026/27 schema entirely** — removed, not empty. Grade forward work against the **Betfair Exchange close** (`bfec*`, from 2024/25, ~100% covered). Do not fall back to Bet365 or market-average and call it the closing line.
 - **`fixtures.csv` is a rolling ~4-day window**, not a season fixture list, collected Friday ≤17:00 UK and Tuesday ≤13:00 UK. Anything reading it must run at least every four days or fixtures are silently never predicted. It retains already-played fixtures, so filter on kickoff.
 - **`download_all` cannot refresh anything.** It skips files on disk *and* keys in `_missing.json`. Use `refresh_current()`, which purges the current season from both — eight 2026/27 divisions are memoised missing and would otherwise never arrive.

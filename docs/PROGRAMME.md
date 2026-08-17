@@ -6,36 +6,23 @@
 
 ## Where we are — read this first
 
-**Last session: 2026-08-17 (second session that day).** Forward validation is built and the four hypothesis files exist. 299 tests green at close.
+**Last session: 2026-08-17 (third session that day).** H1 was pre-registered, run, and settled — **it passed, the first hypothesis in this programme to do so** — and its diagnostics then found that the test had been run against the wrong null, which reaches back into the founding study. 302 tests green at close.
 
-**Done**
-- Football v2 built, measured, and its betting question answered — see the graveyard below.
-- `.claude/` setup: project CLAUDE.md, settings, `/wrap-up`. This repo had none before.
-- This registry, seeded with an honest configuration count.
-- **Forward validation, end to end.** `src/data/fixtures.py` (unplayed-fixture ingest), the `unplayed` contract in `src/features/horizon.py`, `src/forward.py` (predict and record), `src/grade.py` (grade and write the ledger), `src/refresh.py`, and `.github/workflows/forecast.yml` on a Tuesday/Friday cron. Dry-run measured at **4m05s locally** for the full path including three training seeds.
-- **H1–H4 files written**, in `docs/hypotheses/`. All `proposed`; none pre-registered.
+**What happened, shortest version.** H1 asked whether lower-division football is priced less efficiently. Its pre-registered test came back **SUPPORTED**: the pooled lower stratum (tiers 3–5) returned CLV 1.0083 with 52.53% of prices shortening over 9,920 bets, p < 0.0001, against a floor of 3,250. The result was committed *before* any control was run, deliberately.
 
-**The finding that changed the programme.** **football-data dropped Pinnacle entirely in 2026/27** — the columns are absent from the schema, not empty, and the last populated `psch` anywhere is 2026-01-14. The replacement is the **Betfair Exchange close**, and measuring the two on the 16,875 matches carrying both showed it is **not a downgrade**: equally accurate (de-vigged RPS 0.20404 vs 0.20408) on a quarter of the margin (overround 1.0089 vs 1.0389), with prices 3.9% longer. Beating it is at least as hard. Full detail and the commands in `docs/research/00-measured-facts.md`.
+Then the controls found that **50% is not the null for "% shortened".** Pinnacle's overround tightens toward kickoff every season, so prices lengthen by default and a randomly chosen band-eligible selection shortens only 45–48% of the time. Three readings already committed did not survive that correction, and are corrected in `docs/H1_RESULT.md` rather than edited away.
 
-**The workflow is live and verified on a real runner.** Repo is `tracsj/match-predictor`, **private**, default branch `master`. Run `32068718466` went green end to end on 2026-08-17 and committed `docs/FORWARD_LEDGER.md` by itself. Measured, cold cache:
+**The corrected finding, which is not the one H1 claimed.** Against each tier's own drift, **tier 1 is the only tier indistinguishable from its own baseline** (+0.70pp, z = 1.35) — which is what an efficient market should look like — while every tier beneath it is distinguishable: tier 2 +4.16pp, tier 3 +7.68pp, tier 4 +8.65pp, tier 5 +4.25pp. So this model **anticipates line movement in every division except the top flight**, most strongly in tiers 3–4. The gradient is not monotone, so the thin-market mechanism is qualified rather than vindicated.
 
-| step | cold | note |
-|---|---|---|
-| setup + `uv sync` | ~40s | |
-| **refresh** | **271s** | 724 files, **0 errors** — football-data does not block runner IPs, which was a real open risk. Warm cache re-fetches only ~38 files |
-| 302 tests | ~110s | green on a fresh runner |
-| self-test guard | ~2s | the four checks genuinely ran on CI |
-| predict | 3s | *no fixtures in the window* — this run did not exercise training |
-| grade + commit | ~7s | pushed on its own |
-| **total** | **8m14s** | |
+**It is still not a strategy, and that part survives every reading.** ROI at the prices actually taken is −4.69% (lower) and −4.91% (upper). The anticipation is worth 1–2% on price against a ~4% margin.
 
-The CI corpus reproduced local exactly: 296,218 matches, 2026-27 at 253 matches across 18 divisions. **Training on a runner is still unmeasured**, since the horizon was empty — 4m locally, so budget 12–20 min against the 120-minute timeout.
+**The out-of-sample check, which is the one that matters.** 2025-26 re-sliced by tier: lower +6.74pp over that season's own matched drift (z = 2.55, p = 0.011) against +7.09pp in sample; upper +1.80pp (z = 1.05, not significant). **Directionally consistent and close in size — not a replication**, at 309 and 823 bets against a 3,250 floor, and both are inconclusive by that floor.
 
-**Four bugs only a real runner would have found**, all of which failed silently or would have:
-1. `refresh_current()` wrote `_missing.json` before the directory existed — `data/` is gitignored, so every checkout starts empty.
-2. `--no-refresh` disabled the *fixtures* fetch as well as the corpus one, and `src.refresh` never fetches `fixtures.csv`.
-3. `actions/checkout` defaults to a **depth-1 shallow clone**, on which `git log` finds nothing, so every prediction would have read as "uncommitted" and the ledger would have graded **nothing while exiting zero**. `fetch-depth: 0` is mandatory; the grader now refuses on a shallow clone.
-4. `astral-sh/setup-uv` publishes major tags only to `v7` while its release is `v10.0.1`, so `@v10` does not resolve. Pinned exactly.
+**Why this matters beyond H1.** `docs/PHASE6_RESULT.md` reads its 0.9952 CLV as "the selections sat on the wrong side of the market's own movement". On its own population the drift is 0.9904 / 38.89% shortened while it observed 0.9952 / 42.4% — the *right* side. Its ROI tables and its "the rule lost money" conclusion are untouched; only that one clause is in doubt. A dated addendum is on the file and on `CLAUDE.md`, and **nothing was rewritten** — the re-derivation that would settle it is item 2 below.
+
+**Still true from the previous session, and unchanged:** the forward workflow is live and verified on a real runner (`tracsj/match-predictor`, private, default branch `master`), Pinnacle is gone from the 2026/27 schema, and the exchange close replaces it going forward. The four runner-only bugs and the cold-cache timings are further down this file.
+
+**New data boundary found this session.** `bfeh/bfed/bfea` — the exchange **pre-close** — are **absent from the results files entirely**, arriving only through `fixtures.csv`. The exchange can grade forward CLV and cannot grade a backward-looking one at all, so `psh → psch` is the only historical ladder and it ends 2026-01-14.
 
 **Next, in order**
 
@@ -52,8 +39,6 @@ The CI corpus reproduced local exactly: 296,218 matches, 2026-27 at 253 matches 
 6. **H2 pre-registered, then run.**
 
 7. **H1b, only if it earns a slot**: the 2012-15 seasons, never graded and never used for model selection. Reaching them requires relaxing `run_walk_forward`'s hardcoded `min_train_seasons=3`, which is a protocol change and belongs in a pre-registration rather than an improvisation after seeing a positive.
-
-**Done 2026-08-17 (third session)** — H1 pre-registered and run. It **passed**, the first thing in this programme to do so, and the diagnostics then showed its test had been run against the wrong null. Write-up in `docs/H1_RESULT.md`; the correction is above.
 
 **Open threads worth knowing**
 - `uv run python -c` is denied in `.claude/settings.json` on purpose, to push analysis into re-runnable files. It cost three extra steps this session and was worth it each time — the scripts are re-runnable.
@@ -93,6 +78,21 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 **Configurations evaluated to date: 48.**
 
 **+1 on 2026-08-17 (third session): the H1 tier-stratified run.** One configuration — inherited rule, inherited model, one pre-specified contrast — scored on CLV and ROI. It **passed its pre-registered test**, which is the first time anything here has. `docs/H1_RESULT.md` carries the tables and the diagnostics, and the diagnostics matter more than the verdict.
+
+**Eight other things ran that session and none of them counts.** Named individually rather than summarised, because "nothing else was evaluated" is indistinguishable from having skipped the step:
+
+| what ran | why it does not count |
+|---|---|
+| `h1_coverage_probe.py` | counts price coverage and computes the bet floor's power arithmetic. Fits nothing, scores nothing |
+| `h1_panel_check.py` | plumbing pre-flight driven by **random** probabilities. Prints no verdict; its numbers are noise by construction |
+| `h1_diagnostics.py` — ordered logit arm | a deliberate null. The question is "would a dumb model do this too?", not "is this model better" |
+| `h1_diagnostics.py` — anti-model arm | bets the **minimum**-EV outcome. Nobody hopes it wins; it exists to see the effect invert |
+| `h1_diagnostics.py` — random-in-band arm | random selection. A control in the same sense as `random_bet_null` |
+| `h1_holdout_coverage.py` | column presence only. No model |
+| `h1_holdout_tiers.py` | **re-slices the settled Phase 6 run by tier.** Same configuration, same holdout, a question that run never asked — a new cut of an existing result, not a new configuration |
+| `h1_odds_matched_null.py`, `h1_tier_nulls.py`, `clv_null_calibration.py` | prices only, no model fitted. They measure the **market**, like the exchange-vs-Pinnacle benchmark already ruled on above |
+
+The line that separates them from the H1 run itself: **none searched for edge.** A control whose result nobody is hoping for cannot widen a search, and counting it would overstate the search exactly as surely as omitting a real evaluation would understate it.
 
 | family | n | detail |
 |---|---|---|
