@@ -132,10 +132,16 @@ class NetConfig:
     goal_loss_weight: float = 0.3    # 0.0 disables the goals head (for ablation)
     max_goals: int = 10
     seed: int = 0
+    # Recurrent branch over each team's last N matches. 0 disables it, which is
+    # the default until the ablation says otherwise. The rolling features are
+    # means over the same window and therefore order-blind; a GRU is the
+    # cheapest way to ask whether the ORDER carries anything the mean does not.
+    seq_hidden: int = 0
 
 
 class MatchNet(nn.Module):
-    def __init__(self, n_cont: int, vocab: Vocab, cfg: NetConfig):
+    def __init__(self, n_cont: int, vocab: Vocab, cfg: NetConfig,
+                 n_seq_features: int = 0):
         super().__init__()
         self.cfg = cfg
         torch.manual_seed(cfg.seed)
@@ -153,6 +159,8 @@ class MatchNet(nn.Module):
                     emb.weight[0].zero_()
 
         d_in = n_cont + 2 * cfg.team_dim + cfg.league_dim
+        if cfg.seq_hidden > 0:
+            d_in += 2 * cfg.seq_hidden          # one final state per side
         k, h = cfg.members, cfg.hidden
 
         # k parallel two-layer MLPs, expressed as batched weights so the whole
@@ -169,12 +177,29 @@ class MatchNet(nn.Module):
         self.head_hda = nn.Linear(h, 3)
         self.head_goals = nn.Linear(h, 2)
 
-    def trunk(self, x_cont, home_id, away_id, league_id) -> torch.Tensor:
+        # One GRU shared by both sides, so "a run of good form" means the same
+        # thing whichever team it belongs to. Two separate encoders would have
+        # to learn the concept twice from half the data each.
+        self.gru = (nn.GRU(n_seq_features, cfg.seq_hidden, batch_first=True)
+                    if cfg.seq_hidden > 0 else None)
+
+    def encode_sequences(self, seq) -> torch.Tensor:
+        """(batch, 2, L, F) -> (batch, 2 * seq_hidden), home state then away."""
+        b, sides, L, F = seq.shape
+        flat = seq.reshape(b * sides, L, F)
+        _, h_n = self.gru(flat)
+        return h_n[-1].reshape(b, sides * self.cfg.seq_hidden)
+
+    def trunk(self, x_cont, home_id, away_id, league_id, seq=None) -> torch.Tensor:
         parts = [x_cont]
         if self.team_emb is not None:
             parts += [self.team_emb(home_id), self.team_emb(away_id)]
         if self.league_emb is not None:
             parts.append(self.league_emb(league_id))
+        if self.gru is not None:
+            if seq is None:
+                raise ValueError("seq_hidden > 0 but no sequence tensor was passed")
+            parts.append(self.encode_sequences(seq))
         x = torch.cat(parts, dim=-1)
         # (batch, d_in) -> (batch, k, h)
         z = torch.einsum("bd,kdh->bkh", x, self.w1) + self.b1
@@ -182,8 +207,8 @@ class MatchNet(nn.Module):
         z = torch.einsum("bkh,khg->bkg", z, self.w2) + self.b2
         return self.drop(F.gelu(z))
 
-    def forward(self, x_cont, home_id, away_id, league_id):
-        z = self.trunk(x_cont, home_id, away_id, league_id)
+    def forward(self, x_cont, home_id, away_id, league_id, seq=None):
+        z = self.trunk(x_cont, home_id, away_id, league_id, seq)
         logits = self.head_hda(z).mean(dim=1)            # average the ensemble
         # Softplus keeps the rate positive; the offset centres it near a
         # realistic 1.35 goals rather than starting the model at zero.
@@ -238,6 +263,7 @@ def train_net(
     val_fraction: float = 0.15,
     device: str = "cpu",
     verbose: bool = False,
+    seq_train: np.ndarray | None = None,
 ) -> tuple[MatchNet, dict]:
     """Hand-written training loop, deliberately readable.
 
@@ -263,7 +289,13 @@ def train_net(
     gh = torch.tensor(train_df["fthg"].to_numpy(), dtype=torch.float32, device=device)
     ga = torch.tensor(train_df["ftag"].to_numpy(), dtype=torch.float32, device=device)
 
-    model = MatchNet(X_train.shape[1], vocab, cfg).to(device)
+    n_seq_f = 0 if seq_train is None else seq_train.shape[-1]
+    if cfg.seq_hidden > 0 and seq_train is None:
+        raise ValueError("cfg.seq_hidden > 0 requires seq_train")
+    seq_t = (torch.tensor(seq_train, dtype=torch.float32, device=device)
+             if cfg.seq_hidden > 0 else None)
+
+    model = MatchNet(X_train.shape[1], vocab, cfg, n_seq_features=n_seq_f).to(device)
 
     emb_params = [p for emb in (model.team_emb, model.league_emb)
                   if emb is not None for p in emb.parameters()]
@@ -275,7 +307,8 @@ def train_net(
     opt = torch.optim.AdamW(groups, lr=cfg.lr)
 
     def losses(idx):
-        logits, rates = model(xc[idx], hid[idx], aid[idx], lid[idx])
+        sq = None if seq_t is None else seq_t[idx]
+        logits, rates = model(xc[idx], hid[idx], aid[idx], lid[idx], sq)
         ce = F.cross_entropy(logits, y[idx])
         if cfg.goal_loss_weight > 0:
             pois = (F.poisson_nll_loss(rates[:, 0], gh[idx], log_input=False, full=False)
@@ -328,12 +361,14 @@ def train_net(
 
 @torch.no_grad()
 def predict(model: MatchNet, df: pd.DataFrame, X: np.ndarray, vocab: Vocab,
-            meta: dict, device: str = "cpu") -> dict:
+            meta: dict, device: str = "cpu", seq: np.ndarray | None = None) -> dict:
     """Returns the softmax 1X2, the Poisson-implied 1X2, and the goal rates."""
     Xs = np.nan_to_num((X - meta["mu"]) / meta["sd"])
     xc, hid, aid, lid = _tensors(df, Xs, vocab, device)
+    sq = (torch.tensor(seq, dtype=torch.float32, device=device)
+          if model.cfg.seq_hidden > 0 else None)
     model.eval()
-    logits, rates = model(xc, hid, aid, lid)
+    logits, rates = model(xc, hid, aid, lid, sq)
     p = torch.softmax(logits, dim=-1).cpu().numpy()
     r = rates.cpu().numpy()
     return {"hda": p / p.sum(axis=1, keepdims=True),

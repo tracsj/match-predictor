@@ -17,13 +17,17 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.data.footballdata import OUT_DIR
 from src.features.ratings import add_ratings
 from src.features.rolling import add_rolling
+from src.features.sequences import SeqParams, build_sequences
 
 FEATURES_PARQUET = OUT_DIR / "features.parquet"
+SEQ_NPY = OUT_DIR / "sequences.npy"
+SEQ_MASK_NPY = OUT_DIR / "sequences_mask.npy"
 
 # Everything the models may draw on. Membership here does not mean a model
 # uses it -- see RATING_FEATURES and NET_FEATURES in src.models.
@@ -48,9 +52,29 @@ def build(force: bool = False) -> pd.DataFrame:
     df = add_rolling(df)
     print(f"  rolling   {time.time() - t:5.1f}s")
 
+    # Row position in the full chronological corpus, so the sequence arrays
+    # (which are row-aligned with this frame) can be indexed after filtering.
+    df["corpus_row"] = np.arange(len(df), dtype=np.int64)
+
+    t = time.time()
+    seq, mask = build_sequences(df)
+    print(f"  sequences {time.time() - t:5.1f}s  shape {seq.shape}")
+
     FEATURES_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(FEATURES_PARQUET, index=False)
+    np.save(SEQ_NPY, seq)
+    np.save(SEQ_MASK_NPY, mask)
     return df
+
+
+def load_sequences() -> tuple:
+    """The (n, 2, L, F) sequence tensor and its mask, aligned row-for-row with
+    the features parquet. Built in the same chronological pass, so a row's
+    sequence contains only matches strictly before its own kickoff."""
+    import numpy as _np
+    if not SEQ_NPY.exists():
+        build(force=True)
+    return _np.load(SEQ_NPY), _np.load(SEQ_MASK_NPY)
 
 
 def load(force_rebuild: bool = False) -> pd.DataFrame:

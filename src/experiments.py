@@ -41,7 +41,8 @@ def paired(a: np.ndarray, b: np.ndarray, y) -> dict:
 
 def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
                      calibrate: bool = True, seeds=(0,), verbose=False,
-                     train_pool: pd.DataFrame | None = None):
+                     train_pool: pd.DataFrame | None = None,
+                     sequences: np.ndarray | None = None):
     """Fit the net on each walk-forward split; return stacked OOS predictions.
 
     `train_pool` lets the model train on MORE matches than it is evaluated on.
@@ -60,6 +61,10 @@ def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
     vocab = build_vocab(pool)
     X = panel[features].to_numpy(float)
     X_pool = pool[features].to_numpy(float)
+    # Sequence arrays are row-aligned with the full corpus, so they are
+    # indexed by corpus_row rather than by position in the filtered frame.
+    seq_panel = None if sequences is None else sequences[panel["corpus_row"].to_numpy()]
+    seq_pool = None if sequences is None else sequences[pool["corpus_row"].to_numpy()]
     pool_kick = pd.to_datetime(pool["kickoff"]).to_numpy()
     y_all = panel["result"].to_numpy()
 
@@ -69,16 +74,20 @@ def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
         te = panel.iloc[s.test_idx]
         if train_pool is None:
             tr, X_tr = panel.iloc[s.train_idx], X[s.train_idx]
+            sq_tr = None if seq_pool is None else seq_panel[s.train_idx]
         else:
             keep = pool_kick < np.datetime64(s.test_start)
             tr, X_tr = pool[keep], X_pool[keep]
+            sq_tr = None if seq_pool is None else seq_pool[keep]
             assert pd.to_datetime(tr["kickoff"]).max() < s.test_start
+        sq_te = None if seq_panel is None else seq_panel[s.test_idx]
 
         seed_p, seed_g, seed_logits = [], [], []
         for seed in seeds:
             model, meta = train_net(tr, X_tr, vocab,
-                                    NetConfig(**{**cfg.__dict__, "seed": seed}))
-            out = predict(model, te, X[s.test_idx], vocab, meta)
+                                    NetConfig(**{**cfg.__dict__, "seed": seed}),
+                                    seq_train=sq_tr)
+            out = predict(model, te, X[s.test_idx], vocab, meta, seq=sq_te)
             seed_p.append(out["hda"])
             seed_g.append(out["hda_from_goals"])
 
@@ -88,7 +97,8 @@ def run_walk_forward(panel, cfg: NetConfig, features=RATING_FEATURES,
                 # it on the test season would manufacture the result outright.
                 cut = int(len(tr) * 0.85)
                 val = tr.iloc[cut:]
-                val_out = predict(model, val, X_tr[cut:], vocab, meta)
+                val_out = predict(model, val, X_tr[cut:], vocab, meta,
+                                  seq=None if sq_tr is None else sq_tr[cut:])
                 scaler = TemperatureScaler().fit(val_out["logits"], val["result"])
                 seed_logits.append(scaler.transform(out["logits"]))
 
