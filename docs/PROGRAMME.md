@@ -6,7 +6,7 @@
 
 ## Where we are — read this first
 
-**Last session: 2026-08-17 (third session that day).** Three hypotheses' worth of work landed: **H1 settled (supported, then heavily qualified), Phase 6's CLV reading withdrawn, and H3 settled (supported, and useless).** The count moved 47 → 49. 321 tests green at close.
+**Last session: 2026-08-17 (third session that day).** Three hypotheses' worth of work landed: **H1 settled (supported, then heavily qualified), Phase 6's CLV reading withdrawn, and H3 settled (supported, and useless).** The count moved 47 → 49. **337 tests** green at close.
 
 **The through-line, and it is one finding wearing three hats.** Every CLV number this project had ever reported was tested against a null of 1.0 / 50% — the assumption that the pre-close and the close are on average the same price. **They are not.** Pinnacle's overround tightens toward kickoff every season, so prices lengthen by default and a randomly chosen band-eligible selection shortens only 45–48% of the time. Correcting that null changed the reading of everything it touched.
 
@@ -24,7 +24,9 @@
 
 **A methods caveat that applies to every z-statistic quoted above.** All the shortening-rate tests use `sqrt(p(1-p)/n)`, which assumes bets are independent. They are not: this repo's own `bootstrap_ci` resamples **matchdays** precisely because same-day bets share news and market-wide moves. Clustering cannot overturn z = 7–14 (H1 in-sample, H3), but it plausibly matters for the two marginal results — Phase 6 at p = 0.018 and H1's out-of-sample at p = 0.011 — which are already the two labelled "narrow" and "inconclusive by floor". **A day-clustered shortening test is queued as a methods item**, not run tonight.
 
-**Two data boundaries found this session.** The exchange **pre-close** (`bfeh/bfed/bfea`) is absent from the results files entirely, arriving only through `fixtures.csv` — so there is no backward-looking exchange ladder, and `psh → psch` is the only historical one. And **10 rows carry a Bet365 price of exactly 0.0**, which `notna()` does not catch and `nan_to_num` turns into a huge finite feature; `src/h3.py` filters on `> 0` and anything else reading raw prices should too.
+**Two data boundaries found this session.** The exchange **pre-close** (`bfeh/bfed/bfea`) is absent from the results files entirely, arriving only through `fixtures.csv` — so there is no backward-looking exchange ladder, and `psh → psch` is the only historical one.
+
+And **29 cells across 12 odds columns carry a price ≤ 1.0** — missing data wearing a number, invisible to `notna()` and converted by `nan_to_num` into a huge finite feature with no error and no NaN. Found as 10 rows of `b365h` by a prose note; **building the checker immediately found eleven more columns**, including `b365ca`, `maxca` and `avgca`, which are **1X2 closing** columns H1 and Phase 6 both priced ROI against. No reported number moved — a zero scores EV −1 and can never be a rule's argmax, and `min_odds` excludes it again — and `tests/test_price_sanity.py` now asserts that mechanism rather than trusting the row count. **Anything reading raw prices must filter `> 1.0`.**
 
 **Next, in order**
 
