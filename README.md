@@ -16,6 +16,38 @@ data/               gitignored. Raw cache + derived parquet.
 models/             gitignored. Checkpoints.
 ```
 
+## Results
+
+Walk-forward, 45,629 out-of-sample matches across 22 divisions and 9 seasons:
+
+| model | RPS | log loss |
+|---|---|---|
+| market (de-vigged Pinnacle close) | **0.20291** | 0.99815 |
+| the network (GRU sequence branch) | 0.20765 | 1.01333 |
+| ordered logit on 49 features | 0.20789 | 1.01440 |
+| CatBoost / ordered logit on ratings only | 0.2090 | 1.0178 |
+| base rate | 0.2292 | 1.0771 |
+| uniform | 0.2340 | 1.0986 |
+
+The network beats the best non-neural baseline (t = +2.50) and does not come
+close to the market (t = +20). Three write-ups carry the detail:
+
+- **`docs/PHASE6_RESULT.md`** — would it have made money? No. The
+  pre-registered rule, run once on an untouched season, loses in every price
+  column and produces closing-line value *below* 1.0.
+- **`docs/TIER2_RESULT.md`** — what is a starting XI worth? No measurable
+  effect, from an experiment that could only have detected a large one. Do not
+  upgrade the SportMonks plan.
+- **`docs/PREREGISTRATION.md`** — the betting rule, prices and holdout, fixed
+  before any model PnL existed.
+
+The single most useful finding for anyone repeating this: **the sequence
+branch is the only neural component that beat the baseline.** Team embeddings,
+league embeddings, extra trunk members and a wider hidden layer all either hurt
+or did nothing. Rolling *means* over a team's last ten matches are order-blind;
+a GRU over the same window is not, and that difference is worth more than every
+other architectural choice combined.
+
 ## Read these first
 
 - **`docs/research/00-measured-facts.md`** — what the SportMonks key actually reaches, what football-data.co.uk actually contains, and the exact commands that established each. Every claim here was probed, not assumed.
