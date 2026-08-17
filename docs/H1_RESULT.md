@@ -161,6 +161,8 @@ Season 2025-26 is the only data outside the contamination pathway. `scripts/h1_h
 
 **Both strata are INCONCLUSIVE BY FLOOR** — 309 and 823 bets against the pre-registered 3,250 — and the floor is not lowered to let them speak.
 
+**The z here assumes independent bets and they are not** — `bootstrap_ci` resamples matchdays for exactly that reason. At p = 0.011 on 309 bets this has no margin to spare, which is a second reason beyond the floor to treat it as directional only. Queued as a methods item.
+
 Read against 50%, that 38.19% looks like the finding collapsing. Read against the season's own drift of 31.45% — 2025-26 has by far the most extreme drift in the corpus — it is **directionally consistent with in-sample and close to it in size**. It is *not* a replication: the lower stratum is marginally significant on 309 bets, the upper is not significant at all, and both nulls come from a single anomalous season. Directionally consistent is the strongest phrase the evidence supports.
 
 ### The thing that stops all of it being a strategy
@@ -186,8 +188,8 @@ That claim carries a real caveat and is not being acted on tonight: this null is
 
 ### What should happen next
 
-1. **Re-analyse Phase 6's CLV against a measured null**, pre-registered, with the bet population re-derived rather than approximated.
-2. **H3 inherits this entire apparatus** — the drift measurement, the requirement that CLV be tested against a measured null rather than 1.0, and the measured fact that the exchange pre-close does not exist historically so `psh → psch` is the only backward-looking ladder. H3 targets line movement directly, which is what these diagnostics say the model is actually doing.
+1. ✅ **Done the same day** — see `docs/PREREG_PHASE6_NULL.md`. ~~Re-analyse Phase 6's CLV against a measured null, pre-registered, with the bet population re-derived rather than approximated.~~
+2. ✅ **Done the same day** — H3 was pre-registered, run and settled; see `docs/H3_RESULT.md`. It inherited this apparatus and came back supported-but-sub-margin, and *not* separable from the match model's incidental signal. ~~H3 inherits this entire apparatus~~ — the drift measurement, the requirement that CLV be tested against a measured null rather than 1.0, and the measured fact that the exchange pre-close does not exist historically so `psh → psch` is the only backward-looking ladder. H3 targets line movement directly, which is what these diagnostics say the model is actually doing.
 3. **H1b, if it is worth running**: the never-graded 2012-15 seasons, which model selection also never touched. Reaching them needs `min_train_seasons` relaxed, and that is a protocol change that belongs in a pre-registration rather than an improvisation after seeing a positive.
 
 ### Every control run tonight

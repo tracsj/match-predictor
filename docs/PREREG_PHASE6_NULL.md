@@ -87,6 +87,8 @@ An exact reproduction, well inside every tolerance. The population is Phase 6's.
 
 **The pre-registered criterion is met and it is met by a small margin.** The observed 0.4241 sits above the interval's upper bound of 0.4196 by less than half a percentage point. The z of 2.36 (p = 0.018) would **not** have cleared the p < 0.01 bar that `docs/PREREGISTRATION.md` set for claiming edge. The criterion here was "above the 95% interval", fixed in advance, and it is satisfied — but a result this close to its own boundary should be described as what it is.
 
+**The z assumes independent bets, and they are not.** `sqrt(p(1-p)/n)` treats every bet as its own draw, while this repo's `bootstrap_ci` resamples **matchdays** because same-day bets share news and market-wide moves. At p = 0.018 this result has no margin to give away, so the honest statement is that day-clustering could plausibly move it across 0.05 and it has not been tested. Queued as a methods item, not run here.
+
 **All four ladders point the same way, and that is weaker evidence than it looks.** Every one of them shows the model above its own drift, by between 3.2 and 6.5 points. That consistency is reassuring about the direction, but the four are **not** four independent confirmations: they are largely the same matches and heavily overlapping selections, differing mainly in which book's price was taken. Treat it as one result seen from four angles.
 
 **What is now established.** Phase 6's selections were **not** on the wrong side of the market's movement. Against each ladder's own drift they were consistently on the right side of it. The published sentence was an artifact of comparing against a null of 1.0.
