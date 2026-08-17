@@ -2,6 +2,33 @@
 
 **Live working doc.** Updated whenever a hypothesis changes status, and reconciled at every session wrap-up.
 
+---
+
+## Where we are — read this first
+
+**Last session: 2026-08-17.** The football study is finished and settled; the programme is standing up around it.
+
+**Done**
+- Football v2 built, measured, and its betting question answered — see the graveyard below.
+- `.claude/` setup: project CLAUDE.md, settings, `/wrap-up`. This repo had none before.
+- This registry, seeded with an honest configuration count.
+
+**Next, in order**
+
+1. **Flesh out `docs/hypotheses/` entries for H1–H4** — currently only listed on the status board below, with no files behind them.
+2. **Forward-validation workflow** (`.github/workflows/forecast.yml`). Weekly cron: refresh CSVs, retrain (~60s), predict upcoming fixtures, commit a prediction file timestamped *before* kickoff, grade past ones as results land. Plain Python, no Claude in the loop, no secrets — `football-data.co.uk/fixtures.csv` is free and unauthenticated. **Land this early**, so the ledger accumulates while everything else proceeds.
+3. **H1 pre-registered, then run.** Zero new data.
+4. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first.
+5. **H2 pre-registered, then run.**
+6. **H3 ingest** (sportsbookreviewsonline — needs a browser user-agent or it 404s) and pre-registration.
+
+**Open threads worth knowing**
+- `uv run python -c` is denied in `.claude/settings.json` on purpose, to push analysis into re-runnable files. If it turns out to be more friction than it is worth, that is one line to remove.
+- The `no-script-file-mutation.py` hook was **not** adopted here. Its promotion review is dated on-or-after 2026-09-07 and requires re-running corpus validation against this repo's own transcripts. Evidence for that review: the 2026-08-17 session used script-based file edits heavily.
+- Forward CLV may have to grade against Bet365 or market-average closing, since Pinnacle closing stops February 2026. Establish which columns are populated in 2026-27 on the first run.
+
+---
+
 ## The prior
 
 Most entries here will die. That is the expected outcome, not a disappointment.

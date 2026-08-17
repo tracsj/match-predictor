@@ -43,7 +43,15 @@ Before we close this session:
 
 10. **Memory health** — Periodically (every 5–10 sessions) run `/housekeeping`. Skip if last run was recent.
 
-11. **Commit wrap-up changes** — Stage and commit any changes made during wrap-up. Scope every commit with a `--` pathspec after the `-m` flags; never `git add .`. For a multi-line message, Write to the scratchpad and use `git commit -F` — inline multi-line `-m` breaks on apostrophes. Run `git status` in **both** the project repo and `~/.claude/`.
+11. **Next-session brief** — *the step whose absence is invisible until the next session opens cold.*
+
+    Update the **"Where we are — read this first"** section at the top of `docs/PROGRAMME.md`: what was finished, what is next in order, and any open thread a fresh session would otherwise rediscover.
+
+    It goes there rather than in a plan file because plan files live in `~/.claude/plans/` under generated names — there are dozens, and no future session has a reason to guess which one is this project's. `docs/PROGRAMME.md` is pointed at from `CLAUDE.md`, which auto-loads, so it is actually reachable.
+
+    Write it for someone with no memory of the session. "Continue where we left off" is not a brief; the next concrete action, with the file it touches, is.
+
+12. **Commit wrap-up changes** — Stage and commit any changes made during wrap-up. Scope every commit with a `--` pathspec after the `-m` flags; never `git add .`. For a multi-line message, Write to the scratchpad and use `git commit -F` — inline multi-line `-m` breaks on apostrophes. Run `git status` in **both** the project repo and `~/.claude/`.
 
 ## Verification
 
@@ -52,6 +60,7 @@ The wrap-up is complete when all of the following hold, checked rather than assu
 - `uv run pytest -q` is green, or the failure is stated explicitly in the closing message.
 - `git status` is clean in **both** `match-predictor` and `~/.claude/`.
 - Every configuration evaluated this session appears in `docs/PROGRAMME.md`, and its running count moved by the right amount.
+- The "Where we are" section names a **concrete next action and the file it touches**, not a topic.
 - No `## Staging` section exceeds a handful of entries.
 
 Run `git status` in both repos and `git log --oneline -3` in the project repo as the very last action, then output this report with each step marked ✓ or ✗:
@@ -68,7 +77,8 @@ Wrap-up complete:
 ✓/✗ Step 8  — Context file descriptions audit (clean / updated N)
 ✓/✗ Step 9  — CLAUDE.md (N additions / nothing stale / global check)
 ✓/✗ Step 10 — Memory health (skipped / ran /housekeeping)
-✓/✗ Step 11 — Changes committed; git status clean (project + ~/.claude)
+✓/✗ Step 11 — Next-session brief updated in docs/PROGRAMME.md
+✓/✗ Step 12 — Changes committed; git status clean (project + ~/.claude)
 ```
 
 If any step is ✗, state why before closing.

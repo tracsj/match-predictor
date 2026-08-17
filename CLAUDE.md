@@ -10,11 +10,13 @@ A standing programme hunting for exploitable inefficiency in sports betting mark
 
 ## Where the detail lives
 
+**Starting a session cold? Read `docs/PROGRAMME.md` first** — its "Where we are" section is the handoff: what was finished last time, what is next in order, and the open threads. Everything else below is read on demand.
+
 None of these is `@`-imported — an imported spoke is still always-loaded and saves nothing. Read one when its rule is about to bind.
 
 | file | what is in it |
 |---|---|
-| `docs/PROGRAMME.md` | the hypothesis registry — status, graveyard, running count of everything ever tested |
+| `docs/PROGRAMME.md` | **the handoff** ("Where we are"), plus the hypothesis registry — status board, graveyard, and the running count of every configuration ever tested |
 | `docs/hypotheses/*.md` | one file per hypothesis: pre-registration inline, result when settled |
 | `docs/PREREGISTRATION.md` | the football betting rule, prices and holdout, fixed before any PnL existed |
 | `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting |
