@@ -81,10 +81,20 @@ efficient.
 
 ## Expected outcome
 
-**No edge.** The specific reason: the Poisson head was measured as a *worse*
-forecaster than the softmax head on 1X2 in the settled study. A head that is
-worse at the market it was trained against is an odd candidate to be better at a
-market derived from the same distribution.
+**No edge**, per the programme's prior.
+
+A tempting additional argument is that the Poisson head is a worse 1X2
+forecaster than the softmax head, so it is an odd candidate to be better at a
+derived market. **That is not established here.** `docs/PREREGISTRATION.md` says
+only that the Poisson head "is reported alongside but is **not** the betting
+signal", and no document in this repo carries a measured comparison of the two
+heads' forecast quality. Grepped 2026-08-17 and found nothing.
+
+So the honest version is weaker: the goals head is **unmeasured** as a
+forecaster, in every market. Measuring it on 1X2 — where there is a known
+benchmark — is the cheap first step, and should probably happen before any
+derived-market bet is simulated at all. If it cannot match the softmax head on
+the market both can express, the case for trusting it on O/U is thin.
 
 ## Result
 

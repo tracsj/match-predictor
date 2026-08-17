@@ -162,6 +162,20 @@ def join_results(preds: pd.DataFrame) -> pd.DataFrame:
     return graded
 
 
+def corpus_in_window(divs: list[str], lo: pd.Timestamp, hi: pd.Timestamp) -> pd.DataFrame:
+    """Settled corpus fixtures in these divisions between these kickoffs.
+
+    The denominator for schedule coverage. Bounded by the span we have actually
+    predicted, so it measures what the feed window and the cron missed rather
+    than counting every match played before the ledger existed.
+    """
+    corpus = pd.read_parquet(OUT_DIR / "matches.parquet",
+                             columns=["match_id", "div", "kickoff", "result"])
+    k = pd.to_datetime(corpus["kickoff"])
+    return corpus[corpus["div"].isin(divs) & corpus["result"].notna()
+                  & (k >= lo) & (k <= hi)].reset_index(drop=True)
+
+
 def _fmt(df: pd.DataFrame) -> str:
     return df.to_string(index=False, float_format=lambda v: f"{v:.4f}")
 
@@ -203,6 +217,12 @@ def build_report(verbose: bool = True) -> str:
     w("Each file's commit time against the earliest kickoff it predicts. A file")
     w("committed at or after any of its own kickoffs is not graded at all.")
     w("")
+    w("**The newest file normally shows `uncommitted` here, and that is correct.**")
+    w("Grading runs before the commit step, so the file this run just wrote is still")
+    w("untracked while this table is being built. It is committed moments later, in")
+    w("the same workflow step that commits this ledger, and grades normally from the")
+    w("next run onward. Nothing needs fixing.")
+    w("")
     w("```")
     w(_fmt(prov[["file", "rows", "committed_at", "first_kickoff", "status"]]))
     w("```")
@@ -231,6 +251,50 @@ def build_report(verbose: bool = True) -> str:
 
     p = settled[["p_home", "p_draw", "p_away"]].to_numpy(float)
     y = settled["result"].to_numpy()
+
+    # Coverage of the schedule, not of the predictions -- i.e. what the feed
+    # window and the cron between them MISSED. Printed as rows with no verdict,
+    # because what counts as an acceptable miss rate is a judgement.
+    #
+    # The specific worry this exists to measure: fixtures.csv is a rolling ~4-day
+    # window and is uploaded twice a week, Friday <=17:00 UK and Tuesday <=13:00
+    # UK. The earliest observed Friday kickoff is 17:30 UK, and a run takes ~20
+    # minutes, so the Friday run CANNOT cover it -- it is only ever reachable
+    # from Tuesday's snapshot, and whether that snapshot reaches Friday is not
+    # something one observation could establish. No cron change fixes this; the
+    # feed only has two states a week. So it is measured instead of assumed.
+    covered_divs = sorted(graded["div"].dropna().unique())
+    span_lo = pd.to_datetime(graded["kickoff"]).min()
+    span_hi = pd.to_datetime(graded["kickoff"]).max()
+    sched = corpus_in_window(covered_divs, span_lo, span_hi)
+    if not sched.empty:
+        predicted = set(graded["match_id"])
+        sched = sched.assign(was_predicted=sched["match_id"].isin(predicted))
+        by_slot = (sched.assign(
+                       weekday=pd.to_datetime(sched["kickoff"]).dt.day_name().str[:3],
+                       hour=pd.to_datetime(sched["kickoff"]).dt.hour)
+                   .groupby(["weekday", "hour"], as_index=False)
+                   .agg(fixtures=("match_id", "size"),
+                        predicted=("was_predicted", "sum")))
+        by_slot["missed"] = by_slot["fixtures"] - by_slot["predicted"]
+        by_slot = by_slot.sort_values("missed", ascending=False)
+        w("## Schedule coverage")
+        w("")
+        w("Every corpus fixture in the divisions and date span we have predicted, by")
+        w("kickoff slot, and whether a prediction exists for it. **A miss here is not a")
+        w("bad prediction — it is no prediction at all**, which is the failure mode that")
+        w("does not announce itself.")
+        w("")
+        w(f"- Fixtures in scope: **{len(sched):,}** across {len(covered_divs)} divisions")
+        w(f"- Predicted: **{int(sched['was_predicted'].sum()):,}**")
+        w(f"- Missed: **{int((~sched['was_predicted']).sum()):,}**")
+        w("")
+        w("Worst slots first. Friday early kickoffs are the known suspect.")
+        w("")
+        w("```")
+        w(_fmt(by_slot.head(12)))
+        w("```")
+        w("")
 
     w("## Forecast quality")
     w("")

@@ -40,6 +40,7 @@ The CI corpus reproduced local exactly: 296,218 matches, 2026-27 at 253 matches 
 **Next, in order**
 
 1. **Watch the first scheduled run, Tuesday 13:15 UTC.** It is the first with a non-empty horizon, so it is the first to exercise training and to write an actual prediction file.
+2. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model that makes a run fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
 2. **H1 pre-registered, then run.** Zero new data, capped at 2024/25. Its file names the three things still open, chiefly the single pre-specified tier contrast rather than a five-way search.
 3. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
 4. **H3 in its free form**, which is cheaper than the status board previously said — see the correction below.

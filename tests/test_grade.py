@@ -91,8 +91,11 @@ def test_a_file_committed_before_kickoff_is_graded(predictions_dir, monkeypatch)
     monkeypatch.setattr(grade, "file_committed_at",
                         lambda p: pd.Timestamp("2026-01-01 09:00"))
     text = grade.build_report(verbose=False)
-    assert "committed too late" not in text
-    assert "uncommitted" not in text
+    # Check the file's own provenance ROW, not the whole document -- the preamble
+    # legitimately discusses both failure statuses, so a document-wide string
+    # search passes or fails for the wrong reasons.
+    row = next(ln for ln in text.splitlines() if "2026-01-01.csv" in ln)
+    assert row.rstrip().endswith("ok"), row
     # A made-up match_id has no result, so the row is counted and awaits one.
     assert "Predictions committed: **1**" in text
     assert "Awaiting result: **1**" in text
