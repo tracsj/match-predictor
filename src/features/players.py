@@ -33,37 +33,42 @@ from src.data.sportmonks_parse import COUNT_STATS, RATE_STATS
 
 __all__ = ["SquadParams", "build_squads", "player_feature_names"]
 
-# Only statistics SportMonks records CONSISTENTLY across seasons.
+# Statistics SportMonks actually MEASURES across the whole window.
 #
-# This list is the output of a measurement, not a judgement about which
-# statistics are interesting. 16 of the 37 are collected in some seasons and
-# written as literal ZERO -- not null -- in others. `touches` is the extreme
-# case: 100% zero in 9 of 11 seasons and a perfectly sensible 56.7 per full
-# match in the other two. Including it would teach the model that players
-# before 2024 never touched the ball, and nothing about that failure is
-# visible in a summary statistic, because a zero looks like data.
+# The criterion is coverage -- the fraction of player-matches where the value
+# is present -- not how often it is zero. That distinction was a real error
+# worth recording, because the first version of this list got it backwards.
 #
-# The discriminator is the SPREAD of the per-season zero-rate, not its level.
-# A genuinely rare event is rare consistently: goals sit at 89-96% zero in
-# every season (spread 0.067) and assists at 91-96% (spread 0.040). A
-# collection gap swings from near-0% to 100% (touches: spread 1.000,
-# possession_lost 0.998, long_balls 0.955, ball_recovery 0.953). Threshold is
-# 0.30, and `test_players.py` re-derives it so a future fetch that starts
-# collecting more cannot silently leave this list stale.
+# SportMonks OMITS a detail row entirely when a statistic is not collected; it
+# does not return zero. The parser originally filled every absent count with
+# zero for anyone who played, which turned "not measured" into "did it zero
+# times". `touches` then read as 10.9 per 90 against 38.8 passes -- physically
+# impossible, since a player touches the ball more often than they pass it --
+# and I blamed the vendor's data rather than my own fill. With the fill
+# corrected (coverage is now decided per fixture from the set of type ids the
+# feed carries for that match), touches measures 54.1 when present, comfortably
+# above passes at 36.7, exactly as the ordinary definition predicts.
 #
-# Dropped as collection gaps: touches, possession_lost, ball_recovery,
-# long_balls, long_balls_won, long_balls_won_pct, aerials, aerials_won,
-# aerials_lost, aerials_won_pct, tackles_won, tackles_won_pct, clearances,
-# duels_won, duels_lost, shots_off_target.
-MAX_SEASON_ZERO_SPREAD = 0.30
+# What survives is a genuine and much narrower coverage gap: 10 statistics are
+# collected in only 4 of 14 seasons (touches, aerials, aerials_lost,
+# ball_recovery, possession_lost, tackles_won and the percentage variants) and
+# 3 more in 9 of 14 (long_balls, long_balls_won, shots_off_target). Those are
+# excluded because a feature present for a quarter of the corpus cannot carry
+# a rolling window across it.
+#
+# The 24 kept below are present in all 14 seasons at 84-98% coverage.
+# `test_players.py` re-derives this from the data so a future fetch cannot
+# leave the list stale.
+MIN_COVERAGE = 0.80
 
 CORE_COUNTS = [
     "goals", "assists", "shots_total", "shots_on_target", "key_passes",
-    "passes", "accurate_passes", "total_crosses", "total_duels", "tackles",
-    "interceptions", "fouls", "fouls_drawn", "dribble_attempts",
-    "successful_dribbles", "dribbled_past", "dispossessed", "goals_conceded",
+    "passes", "accurate_passes", "total_crosses", "total_duels", "duels_won",
+    "duels_lost", "aerials_won", "tackles", "interceptions", "clearances",
+    "fouls", "fouls_drawn", "dribble_attempts", "successful_dribbles",
+    "dribbled_past", "dispossessed", "goals_conceded",
 ]
-CORE_RATES = ["rating", "accurate_passes_pct", "duels_won_pct"]
+CORE_RATES = ["rating", "accurate_passes_pct"]
 
 
 @dataclass(frozen=True)

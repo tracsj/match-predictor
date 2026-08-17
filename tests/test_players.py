@@ -1,9 +1,10 @@
 """Tests for the squad tensors feeding the player-set encoder.
 
 Two things carry the weight here. Leak-freeness, as everywhere else. And the
-statistic-availability audit: 16 of SportMonks' 37 per-player statistics are
-collected in some seasons and written as literal ZERO in others, and a zero
-looks exactly like data.
+statistic-coverage audit: SportMonks omits a detail row when a statistic is
+not collected, so an absent value must stay NaN rather than becoming a zero
+that reads as a measurement. 13 of the 37 statistics are genuinely available
+for only part of the window and are excluded on that basis.
 """
 
 import numpy as np
@@ -14,7 +15,7 @@ from src.data.sportmonks_parse import (
     COUNT_STATS, MATCHES_PARQUET, PLAYERS_PARQUET, RATE_STATS,
 )
 from src.features.players import (
-    CORE_COUNTS, CORE_RATES, MAX_SEASON_ZERO_SPREAD, SquadParams, build_squads,
+    CORE_COUNTS, CORE_RATES, MIN_COVERAGE, SquadParams, build_squads,
     player_feature_names,
 )
 
@@ -155,42 +156,75 @@ def test_core_stats_are_a_subset_of_what_the_parser_produces():
     assert set(CORE_RATES) <= set(RATE_STATS)
 
 
-def test_the_known_collection_gaps_are_excluded():
-    """Regression test for a real trap.
+def test_the_narrow_coverage_stats_are_excluded():
+    """The statistics SportMonks measures for only part of the window.
 
-    `touches` is 100% zero in 9 of 11 seasons and averages 56.7 per full match
-    in the other two -- a collection gap written as data. Including it would
-    teach the model that players before 2024 never touched the ball.
+    Ten are collected in 4 of 14 seasons and three more in 9 of 14. A feature
+    present for a quarter of the corpus cannot carry a rolling window across
+    it, whatever its value where it exists.
     """
     for stat in ("touches", "possession_lost", "ball_recovery", "long_balls",
-                 "tackles_won", "aerials_won", "clearances", "duels_won"):
-        assert stat not in CORE_COUNTS, f"{stat} is a known collection gap"
-    for stat in ("aerials_won_pct", "tackles_won_pct", "long_balls_won_pct"):
-        assert stat not in CORE_RATES, f"{stat} is a known collection gap"
+                 "long_balls_won", "tackles_won", "aerials", "aerials_lost",
+                 "shots_off_target"):
+        assert stat not in CORE_COUNTS, f"{stat} has only partial coverage"
+    for stat in ("aerials_won_pct", "tackles_won_pct", "long_balls_won_pct",
+                 "duels_won_pct"):
+        assert stat not in CORE_RATES, f"{stat} has only partial coverage"
+
+
+def test_broadly_covered_stats_are_kept():
+    """The other half of the same check, and the half that caught my error.
+
+    These are measured in every season at 88-98% coverage. An earlier version
+    of this list dropped four of them because a parser bug had filled absent
+    rows with zero, making full coverage look like a wall of fake zeros.
+    """
+    for stat in ("aerials_won", "duels_won", "duels_lost", "clearances"):
+        assert stat in CORE_COUNTS, f"{stat} is well covered and should be kept"
 
 
 @needs_data
-def test_the_safe_list_is_still_correct_against_the_real_data():
+def test_every_core_stat_is_actually_measured_across_the_whole_window():
     """Re-derives the audit rather than trusting the hardcoded list.
 
-    If SportMonks starts collecting a statistic it previously skipped, or a new
-    fetch changes the season mix, this fails and the list needs revisiting --
-    which is better than the list silently going stale.
-
-    The discriminator is the SPREAD of the per-season zero-rate, not its level.
-    A genuinely rare event is rare consistently (goals: 0.067); a collection
-    gap swings from near-zero to total (touches: 1.000).
+    The criterion is COVERAGE -- is the value present -- not how often it is
+    zero. Getting that backwards is what produced the earlier wrong list: the
+    parser was filling absent rows with zero, so a coverage gap looked like a
+    measurement of zero and four well-covered statistics were dropped for it.
     """
     players = pd.read_parquet(PLAYERS_PARQUET)
     matches = pd.read_parquet(MATCHES_PARQUET)[["sm_fixture_id", "season_id"]]
     pl = players[players["minutes"].fillna(0) >= 60].merge(matches, on="sm_fixture_id")
 
     for stat in CORE_COUNTS + CORE_RATES:
-        per = pl.groupby("season_id")[stat].apply(lambda s: (s.fillna(0) == 0).mean())
-        spread = float(per.max() - per.min())
-        assert spread <= MAX_SEASON_ZERO_SPREAD, (
-            f"{stat} zero-rate spans {spread:.3f} across seasons -- it looks "
-            "like a collection gap and should leave CORE_*")
+        overall = float(pl[stat].notna().mean())
+        per_season = pl.groupby("season_id")[stat].apply(lambda s: s.notna().mean())
+        assert overall >= MIN_COVERAGE, (
+            f"{stat} is measured in only {overall:.1%} of player-matches")
+        assert (per_season > 0.5).all(), (
+            f"{stat} is missing from {(per_season <= 0.5).sum()} season(s)")
+
+
+@needs_data
+def test_absent_statistics_stay_nan_rather_than_becoming_zero():
+    """The parser bug this whole section exists because of.
+
+    SportMonks omits a detail row when a statistic is not collected. Filling
+    those with zero asserts "did it zero times", which is a measurement claim
+    about data that does not exist. `touches` is the witness: it must be NaN
+    in the seasons where the feed does not carry it, and where it IS carried
+    it must exceed passes, because a player touches the ball more often than
+    they pass it.
+    """
+    players = pd.read_parquet(PLAYERS_PARQUET)
+    full = players[players["minutes"].fillna(0) >= 60]
+
+    assert full["touches"].isna().any(), (
+        "touches is never NaN -- absent rows are being filled with zero again")
+    measured = full[full["touches"].notna()]
+    assert len(measured) > 1000
+    assert measured["touches"].mean() > measured["passes"].mean(), (
+        "where touches is measured it must exceed passes")
 
 
 @needs_data

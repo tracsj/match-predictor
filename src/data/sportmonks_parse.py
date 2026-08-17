@@ -128,6 +128,24 @@ def _parse_fixture(raw: dict) -> tuple[dict, list[dict]] | None:
     match["result"] = "H" if gh > ga else ("D" if gh == ga else "A")
 
     home_id = home.get("id")
+
+    # Which statistics does the feed COVER for this fixture at all?
+    #
+    # SportMonks omits a detail row entirely when a statistic is not collected
+    # -- it does not return zero. So "row absent" is ambiguous on its own: it
+    # means either "this player did it zero times" or "nobody measured it".
+    # The fixture-level set of type ids disambiguates: if any player in the
+    # match has the row, the feed covers it and an absence is a genuine zero.
+    # If nobody does, it is uncollected and must stay NaN.
+    #
+    # Getting this backwards is what made `touches` look like a broken feed:
+    # filling absent rows with zero turned "not measured" into "never touched
+    # the ball", which is a strong and false claim that looks like data.
+    covered = set()
+    for entry in (raw.get("lineups") or []):
+        for d in (entry.get("details") or []):
+            covered.add(d.get("type_id"))
+
     players = []
     for entry in (raw.get("lineups") or []):
         details = {}
@@ -140,6 +158,7 @@ def _parse_fixture(raw: dict) -> tuple[dict, list[dict]] | None:
 
         team_id = entry.get("team_id")
         ff = entry.get("formation_field")
+
         players.append({
             "sm_fixture_id": raw.get("id"),
             "kickoff": match["kickoff"],
@@ -154,7 +173,11 @@ def _parse_fixture(raw: dict) -> tuple[dict, list[dict]] | None:
             # occupies: 1 keeper, 2 defence, 3 midfield, 4 attack.
             "position_group": int(str(ff)[0]) if ff not in (None, "") and str(ff)[0].isdigit() else 0,
             "jersey": entry.get("jersey_number"),
-            **details,
+            "minutes": details.get("minutes", np.nan),
+            # Genuine zeros for statistics the feed covers here; NaN for the
+            # ones it does not measure at all.
+            **{name: details.get(name, 0.0 if tid in covered else np.nan)
+               for name, tid, _ in STAT_DEFS},
         })
 
     return match, players
@@ -181,15 +204,11 @@ def parse_all(write: bool = True, verbose: bool = True) -> tuple[pd.DataFrame, p
     mdf = pd.DataFrame(matches).sort_values("kickoff").reset_index(drop=True)
     pdf = pd.DataFrame(players).sort_values("kickoff").reset_index(drop=True)
 
-    # A missing statistic means "not recorded", which for a count is zero
-    # appearances of that event -- but only for players who actually played.
-    # Leaving NaN for unplayed entries keeps "did not appear" distinguishable
-    # from "appeared and did nothing".
-    if not pdf.empty:
-        played = pdf["minutes"].fillna(0) > 0
-        for col in COUNT_STATS:
-            if col in pdf.columns:
-                pdf.loc[played, col] = pdf.loc[played, col].fillna(0.0)
+    # NOTE: there is deliberately no blanket fillna here. Whether a missing
+    # value means "zero" or "not measured" is decided per fixture in
+    # _parse_fixture, from the set of statistics the feed actually covers for
+    # that match. A blanket fill was the original bug: it manufactured
+    # 80% zeros for `touches` and made a coverage gap look like a measurement.
 
     if verbose:
         print(f"parsed {len(mdf):,} matches, {len(pdf):,} player-match rows "
