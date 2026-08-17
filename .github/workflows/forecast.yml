@@ -37,7 +37,15 @@ jobs:
     timeout-minutes: 120
 
     steps:
+      # fetch-depth: 0 is REQUIRED, not tidiness. src/grade.py establishes each
+      # prediction file's provenance with `git log -1 --format=%cI -- <path>`,
+      # and checkout defaults to a depth-1 shallow clone. On that clone every
+      # file committed in an earlier run has no history, so file_committed_at
+      # returns None, every prediction reads as "uncommitted", and the ledger
+      # grades nothing at all -- silently, and while reporting success.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: astral-sh/setup-uv@v5
         with:

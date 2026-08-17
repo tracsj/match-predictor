@@ -45,6 +45,21 @@ def predictions_dir(tmp_path, monkeypatch):
     return d
 
 
+def test_a_shallow_clone_is_refused_not_silently_ungraded(predictions_dir, monkeypatch):
+    """A shallow clone makes git report no commit for any file, which would read
+    as 'uncommitted' for every prediction and grade nothing while exiting zero.
+    The CI default (`actions/checkout` fetch-depth 1) produces exactly that, so
+    it has to be detected rather than documented."""
+    predictions_dir.mkdir(parents=True)
+
+    class Result:
+        stdout = "true\n"
+
+    monkeypatch.setattr(grade.subprocess, "run", lambda *a, **k: Result())
+    with pytest.raises(SystemExit, match="shallow clone"):
+        grade.build_report(verbose=False)
+
+
 def test_no_prediction_files_is_reported_not_crashed(predictions_dir):
     predictions_dir.mkdir(parents=True)
     text = grade.build_report(verbose=False)

@@ -69,6 +69,35 @@ CLOSE_SETS = [
 ]
 
 
+def assert_full_history() -> None:
+    """Refuse to grade from a shallow clone.
+
+    `file_committed_at` asks git when a file was committed. On a shallow clone
+    the answer is an empty string for every file outside the fetched depth,
+    which this module would otherwise read as "uncommitted" and report as a
+    provenance failure -- for every prediction, while exiting zero.
+
+    That is the worst available failure: the ledger would show no graded rows
+    and a plausible reason for it, and the actual cause (`actions/checkout`
+    defaulting to `fetch-depth: 1`) is nowhere in the output. So it is detected
+    rather than documented.
+    """
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--is-shallow-repository"],
+            cwd=REPO_ROOT, capture_output=True, text=True, timeout=30, check=True,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return          # not a git repo at all; load_predictions reports that per file
+    if out == "true":
+        raise SystemExit(
+            "refusing to grade from a shallow clone: every prediction file would "
+            "read as uncommitted and nothing would be graded.\n"
+            "In CI, set `fetch-depth: 0` on actions/checkout. Locally, run "
+            "`git fetch --unshallow`."
+        )
+
+
 def file_committed_at(path: Path) -> pd.Timestamp | None:
     """Commit time of the last commit touching `path`, or None if uncommitted."""
     try:
@@ -89,6 +118,7 @@ def load_predictions(verbose: bool = True) -> tuple[pd.DataFrame, list[dict]]:
 
     Returns the usable rows plus a per-file provenance report.
     """
+    assert_full_history()
     frames, provenance = [], []
     for p in sorted(PREDICTIONS_DIR.glob("*.csv")):
         try:
