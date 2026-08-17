@@ -62,4 +62,35 @@ The count stays at **48**, and this file is the record of why.
 
 ## Result
 
-*(filled after the run, whatever it says)*
+**Run 2026-08-17. The published reading is OVERTURNED — narrowly.** Reproduce with `uv run python scripts/phase6_null_reanalysis.py`.
+
+### The gate
+
+| | regenerated | published | |
+|---|---|---|---|
+| bets | 1,337 | 1,337 | PASS |
+| mean ratio | 0.9952 | 0.9952 | PASS |
+| % shortened | 0.4241 | 0.4240 | PASS |
+
+An exact reproduction, well inside every tolerance. The population is Phase 6's.
+
+### The measured nulls
+
+| ladder | role | bets | observed | matched null | 95% interval | margin | z | mean ratio | verdict |
+|---|---|---|---|---|---|---|---|---|---|
+| **Pinnacle pre-close** | **PRIMARY** | 1,337 | 0.4241 | 0.3926 | [0.3650, **0.4196**] | **+3.15pp** | 2.36 | 0.9952 | **OVERTURNED** |
+| Bet365 pre-close | descriptive | 1,131 | 0.3616 | 0.2971 | [0.2714, 0.3281] | +6.46pp | 4.75 | 0.9781 | — |
+| market avg pre-close | descriptive | 988 | 0.2834 | 0.2429 | [0.2135, 0.2703] | +4.05pp | 2.97 | 0.9615 | — |
+| market max pre-close | descriptive | 1,532 | 0.5946 | 0.5447 | [0.5196, 0.5725] | +4.99pp | 3.92 | 1.0141 | — |
+
+### Reading it honestly
+
+**The pre-registered criterion is met and it is met by a small margin.** The observed 0.4241 sits above the interval's upper bound of 0.4196 by less than half a percentage point. The z of 2.36 (p = 0.018) would **not** have cleared the p < 0.01 bar that `docs/PREREGISTRATION.md` set for claiming edge. The criterion here was "above the 95% interval", fixed in advance, and it is satisfied — but a result this close to its own boundary should be described as what it is.
+
+**All four ladders point the same way, and that is weaker evidence than it looks.** Every one of them shows the model above its own drift, by between 3.2 and 6.5 points. That consistency is reassuring about the direction, but the four are **not** four independent confirmations: they are largely the same matches and heavily overlapping selections, differing mainly in which book's price was taken. Treat it as one result seen from four angles.
+
+**What is now established.** Phase 6's selections were **not** on the wrong side of the market's movement. Against each ladder's own drift they were consistently on the right side of it. The published sentence was an artifact of comparing against a null of 1.0.
+
+**What is not established, and the pre-registration said so before the run.** That the model is profitable, or that Phase 6's conclusion softens. Its ROI tables are untouched, the rule lost money in every price column, and it lost more than betting at random. The corrected picture is the one H1's diagnostics reached independently: **the model picks prices slightly better than recorded and picks outcomes worse than the market — the price edge is real, roughly 1–2%, and smaller than the margin it has to beat.**
+
+**The expected outcome was recorded in advance as "overturned, with moderate confidence, margin expected to survive matching."** It did survive matching — the unconditional null was 0.3889 and the matched null 0.3926, a shift of 0.004, consistent with the ~0.002 agreement seen in the H1 window.

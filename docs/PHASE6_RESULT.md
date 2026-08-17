@@ -1,14 +1,20 @@
 # Would it have made money? No.
 
-> **⚠️ Addendum 2026-08-17 — the CLV *interpretation* below is in doubt. The tables are not.**
+> **⚠️ Correction 2026-08-17 — one sentence in the CLV section below is wrong. The tables are not.**
 >
-> This page reads its 0.9952 mean ratio and 42.4% shortening rate as *"the selections were systematically on the wrong side of the market's own movement."* That reading assumes the null is a ratio of 1.0 and a shortening rate of 50% — that the pre-close and the close are, on average, the same price.
+> This page reads its 0.9952 mean ratio and 42.4% shortening rate as *"the selections were systematically on the wrong side of the market's own movement."* **That sentence is withdrawn.** It compares against a null of a 1.0 ratio and a 50% shortening rate — that the pre-close and the close are on average the same price. They are not: Pinnacle's overround tightens toward kickoff in every season measured, so prices lengthen by default.
 >
-> **They are not.** Pinnacle's overround tightens toward kickoff in every season measured, so prices lengthen by default. On **this page's own population** — 2025-26, all main divisions, every band-eligible selection carrying both legs — the null is **0.3889 shortened, mean ratio 0.9904**, measured with `scripts/clv_null_calibration.py`. Against that, 42.4% is **+3.51pp above the drift** (z ≈ 2.6), which puts the selections on the *right* side of the market's movement rather than the wrong one.
+> The re-analysis was pre-registered at `docs/PREREG_PHASE6_NULL.md` and run against **this page's own regenerated bet population**, which reproduced the published row exactly (1,337 bets, 0.9952, 0.4241 against 0.4240) before any null was computed. Against an odds-matched null:
 >
-> **What is unaffected**: every ROI number here, the finding that the rule lost money in all four price columns, the random-bet-null comparison, and the conclusion that no staking rule rescues a model that has not first beaten the market on RPS. Those stand.
+> | | observed | matched null | 95% interval | margin |
+> |---|---|---|---|---|
+> | Pinnacle pre-close | 0.4241 | 0.3926 | [0.3650, 0.4196] | **+3.15pp**, z = 2.36 |
 >
-> **What is not settled**: this null is unconditional across eligible selections, while the bets below were model-chosen with a different odds mix. In the H1 population matched and unmatched nulls agreed to within 0.002, which is a reason to expect agreement here — not a demonstration of it. **Re-deriving this page's own bet population against a measured null is its own pre-registered re-analysis, and nothing here has been rewritten on the strength of the flag.** Context in `docs/H1_RESULT.md`.
+> **The selections were on the right side of the market's movement, not the wrong one** — narrowly, at p = 0.018, which would not clear the p < 0.01 bar this project uses for claiming edge. All four pre-close ladders point the same way, though they are overlapping selections rather than independent confirmations.
+>
+> **Everything else on this page stands, and the correction must not be read as softening it**: every ROI number, the finding that the rule lost money in all four price columns, the random-bet-null comparison, and the conclusion that no staking rule rescues a model that has not first beaten the market on RPS. A CLV direction is not a yield. The corrected picture is that the model picked *prices* slightly better than recorded while picking *outcomes* worse than the market — a price edge of roughly 1–2% against a margin near 4%.
+>
+> Full result in `docs/PREREG_PHASE6_NULL.md`; the mechanism and the null's derivation in `docs/H1_RESULT.md`.
 
 **Run 2026-08-17 against `docs/PREREGISTRATION.md`, once.** Reproduce with
 `uv run python -m src.phase6`.
@@ -61,6 +67,13 @@ set the bar as *"CLV mean ratio > 1.0 against Pinnacle close, with a binomial
 p below 0.01"*. Observed: 0.9952, with only 42.4% of prices shortening. That
 is not a near miss — it is the wrong side of the line, and significantly so.
 
+> ⚠️ **Superseded 2026-08-17 — see the correction at the top of this page.**
+> The bar quoted here is the pre-registered one and stands as the bar. What
+> is wrong is the inference that falling under it puts the selections on the
+> wrong side of the market's movement: against a measured null they were on
+> the right side of it. The text is left as written because what this study
+> concluded at the time is part of the record.
+
 The market-maximum row clears 1.0, but that is price shopping rather than
 forecasting, and this project already measured the same effect at +4.0% CLV
 using the market's own de-vigged opinion as the "model".
@@ -100,9 +113,13 @@ but the exact gap should not be over-read.
 ## What this does and does not settle
 
 **Settled**: the pre-registered rule, applied to this model, would have lost
-money over 2025-26. CLV says the selections were systematically on the wrong
-side of the market's own movement, and CLV converges roughly a hundred times
-faster than ROI, so this is the informative half.
+money over 2025-26. ~~CLV says the selections were systematically on the
+wrong side of the market's own movement~~ — **withdrawn 2026-08-17**; against
+a measured null they were on the *right* side of it, by +3.15pp at p = 0.018.
+CLV converges roughly a hundred times faster than ROI, so it is still the
+informative half, and what it now says is that the model's PRICE selection
+was mildly good while its OUTCOME selection stayed worse than the market's.
+**The money conclusion is unchanged.**
 
 **Not settled**: whether a 2% edge exists somewhere in this space. One season
 produced 1,490 bets against the ~45,000 needed to distinguish a 2% edge from
