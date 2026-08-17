@@ -1,5 +1,15 @@
 # Would it have made money? No.
 
+> **⚠️ Addendum 2026-08-17 — the CLV *interpretation* below is in doubt. The tables are not.**
+>
+> This page reads its 0.9952 mean ratio and 42.4% shortening rate as *"the selections were systematically on the wrong side of the market's own movement."* That reading assumes the null is a ratio of 1.0 and a shortening rate of 50% — that the pre-close and the close are, on average, the same price.
+>
+> **They are not.** Pinnacle's overround tightens toward kickoff in every season measured, so prices lengthen by default. On **this page's own population** — 2025-26, all main divisions, every band-eligible selection carrying both legs — the null is **0.3889 shortened, mean ratio 0.9904**, measured with `scripts/clv_null_calibration.py`. Against that, 42.4% is **+3.51pp above the drift** (z ≈ 2.6), which puts the selections on the *right* side of the market's movement rather than the wrong one.
+>
+> **What is unaffected**: every ROI number here, the finding that the rule lost money in all four price columns, the random-bet-null comparison, and the conclusion that no staking rule rescues a model that has not first beaten the market on RPS. Those stand.
+>
+> **What is not settled**: this null is unconditional across eligible selections, while the bets below were model-chosen with a different odds mix. In the H1 population matched and unmatched nulls agreed to within 0.002, which is a reason to expect agreement here — not a demonstration of it. **Re-deriving this page's own bet population against a measured null is its own pre-registered re-analysis, and nothing here has been rewritten on the strength of the flag.** Context in `docs/H1_RESULT.md`.
+
 **Run 2026-08-17 against `docs/PREREGISTRATION.md`, once.** Reproduce with
 `uv run python -m src.phase6`.
 

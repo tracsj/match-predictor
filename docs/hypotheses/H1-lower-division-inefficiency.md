@@ -122,3 +122,17 @@ The lower stratum (tiers 3–5) returned a CLV mean ratio of **1.0083** with **5
 **What the same run also shows, and it is not supporting evidence.** Tier 5 — the National League, the thinnest market in the panel — is the one tier with no effect at all (49.25% shortened). The proposed mechanism was monotone in thinness and the observed pattern is not. ROI in the lower stratum is **−5.43%** at Pinnacle close, worse than the −4.38% random-bet null. And the upper stratum's mean ratio also exceeds 1.0, which is what Jensen's inequality does to a mean of ratios under symmetric noise — the binomial requirement inherited from `docs/PREREGISTRATION.md` is the only thing that separated the two strata.
 
 So H1 is settled as **supported by its own test and unexplained by its own mechanism.** The write-up carries the diagnostics.
+
+### Addendum, same day, after the controls ran
+
+**The paragraph above is wrong in two of its three criticisms, and it is corrected here rather than edited, per this file's own rule.**
+
+The controls established that **50% is not the null for "% shortened"**. Pinnacle's overround tightens toward kickoff in every season measured, so prices lengthen by default and a randomly chosen band-eligible selection shortens only 45–48% of the time. The odds-matched null puts 0.5 outside both strata's intervals, and matched and unmatched nulls agree to within 0.002, so it is not an odds-mix artifact.
+
+Against each tier's **own** drift, tier 5 is **+4.25pp at z = 4.67** — not null at all — and the upper stratum is **+2.67pp at z = 7.84**, not Jensen noise. The only tier indistinguishable from its own drift is **tier 1**, the top flight. The corrected reading is nearly the inverse of the one above: the top division looks efficient and everything below it does not, though the gradient is not monotone (tier 4 peaks, tier 5 falls back to tier 2's level).
+
+**The claim's stratification found something real and named it wrongly.** The finding is that this model anticipates line movement in every tier but the top one, most strongly in tiers 3–4 — which is H3's subject wearing H1's stratification.
+
+**What survives unchanged from the paragraph above**: ROI. At the prices actually taken it is −4.69% in the lower stratum. The anticipation is worth 1–2% on price against a ~4% margin, so there is no strategy here, exactly as "Where it could be staked" predicted.
+
+**The verdict is not revised.** The bar was inherited from `docs/PREREGISTRATION.md` and committed in advance, and a bar is not rewritten once its result is known — including when the correction would arguably *strengthen* the finding. A measured null changes the interpretation, and the interpretation is where it has been put.
