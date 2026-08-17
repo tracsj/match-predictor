@@ -325,21 +325,36 @@ def load_extra_file(path: Path) -> pd.DataFrame | None:
 # Team identity
 # --------------------------------------------------------------------------
 
+# Letters that NFKD does NOT decompose, because they are distinct letters
+# rather than a base plus a combining mark. Without this table they survive
+# accent-stripping and are then destroyed by the a-z filter: "brondby" was
+# coming out as "br ndby", and the same applied to German ss, Polish l and
+# Turkish dotless i. Found while joining SportMonks names to football-data.
+_TRANSLITERATE = str.maketrans({
+    "ø": "o", "Ø": "o", "æ": "ae", "Æ": "ae", "œ": "oe", "Œ": "oe",
+    "ß": "ss", "ð": "d", "Ð": "d", "þ": "th", "Þ": "th",
+    "ł": "l", "Ł": "l", "đ": "d", "Đ": "d", "ı": "i", "İ": "i",
+    "ǆ": "dz", "ĳ": "ij",
+})
+
+
 def normalize_team(name: str) -> str:
     """Fold a raw team name to a matching key.
 
-    Deliberately conservative: casefold, strip accents, drop punctuation and
-    common corporate suffixes, collapse whitespace. It does NOT try to unify
-    genuinely different spellings ('Man United' vs 'Manchester Utd') -- that
-    needs review against real data, and `team_review()` surfaces the
-    candidates rather than guessing.
+    Deliberately conservative: transliterate the non-decomposable letters,
+    strip accents, casefold, drop punctuation and common club suffixes,
+    collapse whitespace. It does NOT try to unify genuinely different names
+    ('AGF' vs 'Aarhus', 'Man United' vs 'Manchester Utd') -- that needs an
+    explicit alias map reviewed against real data, because no amount of string
+    folding turns one into the other. `team_review()` surfaces candidates.
     """
-    s = unicodedata.normalize("NFKD", str(name))
+    s = str(name).translate(_TRANSLITERATE)
+    s = unicodedata.normalize("NFKD", s)
     s = "".join(c for c in s if not unicodedata.combining(c))
     s = s.casefold().strip()
     s = re.sub(r"[.'`]", "", s)
     s = re.sub(r"[^a-z0-9]+", " ", s)
-    s = re.sub(r"\b(fc|afc|cf|sc|ac|as|sv|bk|if|ff|club|kfc)\b", " ", s)
+    s = re.sub(r"\b(fc|afc|cf|sc|ac|as|sv|bk|if|ff|club|kfc|boldklub)\b", " ", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
