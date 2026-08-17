@@ -117,7 +117,12 @@ def run(refresh: bool = True, verbose: bool = True,
             raise RuntimeError(f"refresh failed on {len(rep.errors)} targets: {rep.errors[:3]}")
         build_matches(write=True)
 
-    fixtures = build_fixtures(refresh=refresh, now=now)
+    # The fixtures feed is a SEPARATE fetch from the corpus refresh and a live
+    # run must always do it. `src.refresh` pulls only the results files, so
+    # tying this to `refresh` meant the workflow -- which passes --no-refresh
+    # precisely because src.refresh already ran -- reached a cold runner with no
+    # fixtures.csv at all. The cache is used only to replay a resolved window.
+    fixtures = build_fixtures(refresh=as_of is None, now=now)
     if fixtures.empty:
         print("no upcoming fixtures in the feed window; nothing to predict")
         return None
@@ -196,7 +201,9 @@ def run(refresh: bool = True, verbose: bool = True,
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--no-refresh", action="store_true",
-                    help="use the cached CSVs as they stand (for a dry run)")
+                    help="skip the CORPUS refresh, for when src.refresh has "
+                         "already run. The fixtures feed is fetched regardless — "
+                         "a live run cannot predict from a stale horizon.")
     ap.add_argument("--quiet", action="store_true")
     ap.add_argument("--as-of", default=None,
                     help="DRY RUN ONLY: back-date 'now' to replay a resolved "

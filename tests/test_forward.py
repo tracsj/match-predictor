@@ -190,6 +190,31 @@ def test_current_season_code_matches_season_of():
     assert current_season_code(pd.Timestamp("2026-06-30")) == "2526"
 
 
+def test_no_refresh_still_fetches_the_fixtures_feed(monkeypatch):
+    """CI regression. The workflow passes --no-refresh because src.refresh has
+    already pulled the corpus, but src.refresh does NOT fetch fixtures.csv. Tying
+    both to one flag left a cold runner with no horizon file at all.
+
+    A live run must always fetch the feed; only a back-dated replay may use the
+    cached copy.
+    """
+    import src.forward as fwd
+
+    calls = {}
+
+    def fake_build_fixtures(refresh, now=None):
+        calls["refresh"] = refresh
+        return pd.DataFrame()          # empty horizon ends run() early
+
+    monkeypatch.setattr(fwd, "build_fixtures", fake_build_fixtures)
+
+    fwd.run(refresh=False, verbose=False)
+    assert calls["refresh"] is True, "a live run must fetch the fixtures feed"
+
+    fwd.run(refresh=False, verbose=False, as_of="2026-08-14 12:00")
+    assert calls["refresh"] is False, "a back-dated replay must use the cache"
+
+
 def test_saving_the_missing_manifest_creates_its_directory(tmp_path, monkeypatch):
     """Cold-start regression. refresh_current() writes _missing.json before
     download_all() creates the tree, and data/ is gitignored -- so on every CI
