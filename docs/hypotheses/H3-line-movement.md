@@ -1,7 +1,7 @@
 # H3 — The direction of line movement is predictable
 
-**Status:** `pre-registered`
-**Opened:** 2026-08-17 · **Pre-registered:** 2026-08-17 · **Settled:** —
+**Status:** `settled` — **supported, and useless**
+**Opened:** 2026-08-17 · **Pre-registered:** 2026-08-17 · **Settled:** 2026-08-17
 
 > **This file is now a pre-registration.** Everything below was committed before any H3 model existed and before any movement forecast had been scored. Nothing here may be changed once the run starts; a correction goes in the Result section, not in the rule.
 
@@ -141,4 +141,14 @@ The change is not a hedge, and it is on the record before the run: H1's diagnost
 
 ## Result
 
-*(filled after the run, whatever it says)*
+**Run 2026-08-17. SUPPORTED by its primary test, and it buys nothing.** Full tables in `docs/H3_RESULT.md`.
+
+On the 2024/25 holdout: directional accuracy **44.39%** against a 39.89% majority baseline, and a shortening rate of **0.4782 against an odds-matched null of 0.4356**, 95% [0.4243, 0.4457] — **+4.27pp, z = 6.96, p = 3.3e-12**, on 6,549 bets against the 3,250 floor. Line movement direction is forecastable, comfortably.
+
+**The stakeability test failed, and it was written into the falsifier for exactly this.** The mean ratio of the prices taken is **0.9985** — a gain of −0.15% of price against a **5.08%** pre-close overround. H3 picks the shortening side more often than chance and the magnitudes do not follow. It is a forecasting result and is stated as one.
+
+**The narrowed question came back negative, which is the finding worth keeping.** On 6,173 shared rows, fitting the movement label directly returned **+3.98pp** over the null against the settled match model's **+4.50pp** — difference −0.52pp, z = −0.45, **p = 0.65**. Building a model whose whole purpose is forecasting the market's move does about as well as one that was never asked to. The market appears to move toward what a decent match model already thinks, with no separable microstructure signal on top.
+
+**Consequence for the second step, and it runs against the file's own plan.** This file said an ingest of true opening lines is justified *only if* the free version showed something. It did — and it also showed that what it found is not separable from a match model's existing disagreement signal. **The case for buying opening lines is weaker after this run than before it**, and that is worth stating plainly rather than treating the trigger as met on a technicality.
+
+**The expected outcome was recorded in advance and was right**, including the revision made when H1's diagnostics narrowed the question: a real but small signal, accuracy in the mid-40s, not clearing the margin.

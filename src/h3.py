@@ -84,9 +84,18 @@ def build_frame() -> pd.DataFrame:
     cross-book disagreement features."""
     df = load_features().sort_values("kickoff").reset_index(drop=True)
     need = PINNACLE_PRE.cols + PINNACLE_CLOSE.cols + B365_PRE_COLS
+    # A price of 0.0 is missing data encoded as a number, and notna() does not
+    # catch it. Left in, it becomes an infinite log-implied-probability that
+    # nan_to_num silently turns into a huge finite feature -- no error, no NaN,
+    # just a garbage row treated as informative. Measured at 10 rows in b365h,
+    # all in the training window and none in the holdout
+    # (scripts/h3_zero_price_check.py), so this changes no reported number; it
+    # is fixed because the next season's data has no reason to be as kind.
+    positive = (df[need].to_numpy(float) > 0).all(axis=1)
     df = df[(df["source"] == "main")
             & df["result"].notna()
             & df[need].notna().all(axis=1)
+            & positive
             & df["season"].between(DEV_FIRST, HOLDOUT_SEASON)]
     return df.sort_values("kickoff").reset_index(drop=True)
 

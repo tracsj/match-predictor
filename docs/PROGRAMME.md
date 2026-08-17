@@ -28,15 +28,13 @@ Then the controls found that **50% is not the null for "% shortened".** Pinnacle
 
 1. **Check Tuesday's scheduled run (2026-08-18, 13:15 UTC) — still outstanding.** The 2026-08-17 session could not do this: the cron had not fired yet, and the four runs `gh run list` showed were all that evening's manual dispatches. It is the first run with a non-empty horizon, so the first to exercise training on a runner and the first to write a real `predictions/YYYY-MM-DD.csv`. Concretely: `gh run list --workflow=forecast.yml --limit 3`, then `gh run view <id> --log`, and confirm three things — the predict step reports a fixture count rather than "no upcoming fixtures", training completed inside the 120-minute timeout (unmeasured on 2 vCPUs; 4m05s locally), and `predictions/` gained a file. If it timed out, raise the runner rather than cutting seeds — see the registry ruling below.
 
-2. **H3 in its free form, now much better equipped.** It targets line movement directly, which is what the H1 diagnostics say the model is actually doing. It inherits the drift measurement, the measured-null requirement, and the fact that no exchange pre-close exists historically.
+2. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
 
-3. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
+3. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
 
-4. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
+4. **H2 pre-registered, then run.**
 
-5. **H2 pre-registered, then run.**
-
-6. **H1b, only if it earns a slot**: the 2012-15 seasons, never graded and never used for model selection. Reaching them requires relaxing `run_walk_forward`'s hardcoded `min_train_seasons=3`, which is a protocol change and belongs in a pre-registration rather than an improvisation after seeing a positive.
+5. **H1b, only if it earns a slot**: the 2012-15 seasons, never graded and never used for model selection. Reaching them requires relaxing `run_walk_forward`'s hardcoded `min_train_seasons=3`, which is a protocol change and belongs in a pre-registration rather than an improvisation after seeing a positive.
 
 **Open threads worth knowing**
 - `uv run python -c` is denied in `.claude/settings.json` on purpose, to push analysis into re-runnable files. It cost three extra steps this session and was worth it each time — the scripts are re-runnable.
@@ -73,11 +71,11 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 
 ## The count
 
-**Configurations evaluated to date: 48.**
+**Configurations evaluated to date: 49.**
 
 **+1 on 2026-08-17 (third session): the H1 tier-stratified run.** One configuration — inherited rule, inherited model, one pre-specified contrast — scored on CLV and ROI. It **passed its pre-registered test**, which is the first time anything here has. `docs/H1_RESULT.md` carries the tables and the diagnostics, and the diagnostics matter more than the verdict.
 
-**Eight other things ran that session and none of them counts.** Named individually rather than summarised, because "nothing else was evaluated" is indistinguishable from having skipped the step:
+**Twelve other things ran that session and none of them counts.** Named individually rather than summarised, because "nothing else was evaluated" is indistinguishable from having skipped the step:
 
 | what ran | why it does not count |
 |---|---|
@@ -89,6 +87,10 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 | `h1_holdout_coverage.py` | column presence only. No model |
 | `h1_holdout_tiers.py` | **re-slices the settled Phase 6 run by tier.** Same configuration, same holdout, a question that run never asked — a new cut of an existing result, not a new configuration |
 | `h1_odds_matched_null.py`, `h1_tier_nulls.py`, `clv_null_calibration.py` | prices only, no model fitted. They measure the **market**, like the exchange-vs-Pinnacle benchmark already ruled on above |
+| `phase6_null_reanalysis.py` | recomputes a statistic on Phase 6's **fixed, already-counted** bet population. A new cut, not a new configuration — pre-registered at `docs/PREREG_PHASE6_NULL.md`, which says so |
+| `h3_feasibility.py` | coverage and label balance. Fits nothing |
+| `h3_zero_price_check.py` | counts non-positive prices. Fits nothing |
+| `h3_vs_net.py` | compares two **already-scored** arms on a shared row set. Introduces no configuration |
 
 The line that separates them from the H1 run itself: **none searched for edge.** A control whose result nobody is hoping for cannot widen a search, and counting it would overstate the search exactly as surely as omitting a real evaluation would understate it.
 
@@ -106,6 +108,7 @@ The line that separates them from the H1 run itself: **none searched for edge.**
 | Tier-2 squad encoder arms | 2 | with / without |
 | Phase 6 pre-registered run | 1 | |
 | H1 tier-stratified CLV run | 1 | lower (tiers 3–5) vs upper (tiers 1–2), 2015-16 → 2024-25 |
+| H3 line-movement run | 1 | CatBoost on the 3-way movement label, 60 features, holdout 2024/25 |
 
 **Reconciled 2026-08-17 (second session): the count stays at 47.** Nothing was evaluated in the registry's sense. Three things ran that could be mistaken for evaluations, so each is named rather than left to inference:
 
@@ -133,7 +136,7 @@ What *would* increment it: changing the seed count, the feature set, the archite
 |---|---|---|---|---|---|
 | H1 | Lower-division football is less efficiently priced | **`settled` — SUPPORTED** (2026-08-17) | run, ~50 min | `H1-lower-division-inefficiency.md` → `docs/H1_RESULT.md` | 🟢 lower stratum CLV **1.0083**, 52.53% shortened, 9,920 bets, p<0.0001. **But** tier 5 (the thinnest market of all) shows nothing, ROI is worse than random, and the data was already seen. Supported by its test, unexplained by its mechanism |
 | H2 | Derived markets (**O/U 2.5 only** — see below) | `proposed` | zero new data for O/U; new ingest for the rest | `H2-derived-markets.md` | reuses the Poisson head, which has never been graded for betting. Blocked on the n-outcome work |
-| H3 | Line movement is predictable (pre-close → close) | **`pre-registered`** (2026-08-17) | zero new data; holdout 2024/25 | `H3-line-movement.md` | ⚠️ **narrowed by H1's diagnostics**, which already showed a match model's disagreement predicts movement. H3 now tests whether fitting the label *directly* beats that incidental signal — a smaller and honest question |
+| H3 | Line movement is predictable (pre-close → close) | **`settled` — SUPPORTED, and useless** (2026-08-17) | run, ~10 min | `H3-line-movement.md` → `docs/H3_RESULT.md` | 🟡 movement direction forecastable at **+4.27pp over a matched null, p 3e-12** — but the gain is **−0.15% of price against a 5.08% margin**, and it does **not** beat a match model's incidental signal (−0.52pp, p 0.65). A forecasting result, not a strategy |
 | H4 | Betfair AU/NZ niche leagues (AFL, NRL, NBL, BBL) | `proposed` | new ingest, **source unverified** | `H4-exchange-niche-leagues.md` | best capacity-adjusted option — the exchange does not ban winners. The only one with a genuinely clean holdout |
 
 **H2's scope was overstated on this board.** Only O/U 2.5 is in the football-data feed; BTTS and correct score are not there at all. **H3's cost was overstated too** — the pre-close and closing legs are both already in `matches.parquet`, so the free version needs no ingest.
@@ -150,6 +153,8 @@ Nothing settled yet beyond the founding study.
 | Confidence-threshold filtering | **dead** — deficit to market uniform across confidence; one positive cell was 296 bets with a CI spanning zero | `docs/PHASE6_RESULT.md` |
 | Starting-XI squad encoder (tier 2) | **no measurable effect**, from an experiment that could only have detected one ~14× larger | `docs/TIER2_RESULT.md` |
 | Elo tier-shift correction for promoted teams | **not shipped** — fixed the bias, corrupted the rating pool; the model learns it better from a flag | `src/features/ratings.py` (EloParams) |
+| H3 — a model fitted directly to line movement | **no separable signal** — forecasts movement at +3.98pp over null, statistically indistinguishable from the match model's +4.50pp on the same rows (p 0.65). The market moves toward what a decent match model already thinks | `docs/H3_RESULT.md` |
+| H3 as a staking strategy | **dead** — CLV gain −0.15% of price against a 5.08% pre-close overround | `docs/H3_RESULT.md` |
 
 ## Rules for an entry
 
