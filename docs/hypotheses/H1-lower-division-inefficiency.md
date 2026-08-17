@@ -1,7 +1,7 @@
 # H1 — Lower-division football is priced less efficiently than the top tier
 
-**Status:** `pre-registered`
-**Opened:** 2026-08-17 · **Pre-registered:** 2026-08-17 · **Settled:** —
+**Status:** `settled` — **supported by its pre-registered test**
+**Opened:** 2026-08-17 · **Pre-registered:** 2026-08-17 · **Settled:** 2026-08-17
 
 > **This file is now a pre-registration.** Everything below was committed before any tier-stratified CLV or PnL number existed. Nothing here may be changed once the run starts; if something turns out to be wrong, the run is reported against what is written here and the correction goes in the Result section, not in the rule.
 
@@ -113,4 +113,12 @@ Stated more precisely, so it can be wrong: the lower stratum's CLV mean ratio la
 
 ## Result
 
-*(filled after the run, whatever it says)*
+**Run 2026-08-17. The pre-registered test passed: SUPPORTED.** Full tables in `docs/H1_RESULT.md`.
+
+The lower stratum (tiers 3–5) returned a CLV mean ratio of **1.0083** with **52.53%** of prices shortening across **9,920 bets**, binomial p below 0.0001 — clearing a bar of ratio > 1.0 at p < 0.01 with three times the required volume. The upper stratum did not clear it (1.0046, 50.22% shortened, p = 0.53). The secondary lower-minus-upper difference is +0.00374, 95% [+0.00160, +0.00587].
+
+**The expected outcome recorded in advance was wrong.** This file predicted a ratio below 1.0, near the founding study's 0.9952, with the difference spanning zero. None of that happened.
+
+**What the same run also shows, and it is not supporting evidence.** Tier 5 — the National League, the thinnest market in the panel — is the one tier with no effect at all (49.25% shortened). The proposed mechanism was monotone in thinness and the observed pattern is not. ROI in the lower stratum is **−5.43%** at Pinnacle close, worse than the −4.38% random-bet null. And the upper stratum's mean ratio also exceeds 1.0, which is what Jensen's inequality does to a mean of ratios under symmetric noise — the binomial requirement inherited from `docs/PREREGISTRATION.md` is the only thing that separated the two strata.
+
+So H1 is settled as **supported by its own test and unexplained by its own mechanism.** The write-up carries the diagnostics.

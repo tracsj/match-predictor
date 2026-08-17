@@ -71,7 +71,9 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 
 ## The count
 
-**Configurations evaluated to date: 47.**
+**Configurations evaluated to date: 48.**
+
+**+1 on 2026-08-17 (third session): the H1 tier-stratified run.** One configuration — inherited rule, inherited model, one pre-specified contrast — scored on CLV and ROI. It **passed its pre-registered test**, which is the first time anything here has. `docs/H1_RESULT.md` carries the tables and the diagnostics, and the diagnostics matter more than the verdict.
 
 | family | n | detail |
 |---|---|---|
@@ -86,6 +88,7 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 | Confidence/CLV bucket analyses | 2 | RPS-vs-market by bucket, CLV by bucket |
 | Tier-2 squad encoder arms | 2 | with / without |
 | Phase 6 pre-registered run | 1 | |
+| H1 tier-stratified CLV run | 1 | lower (tiers 3–5) vs upper (tiers 1–2), 2015-16 → 2024-25 |
 
 **Reconciled 2026-08-17 (second session): the count stays at 47.** Nothing was evaluated in the registry's sense. Three things ran that could be mistaken for evaluations, so each is named rather than left to inference:
 
@@ -111,7 +114,7 @@ What *would* increment it: changing the seed count, the feature set, the archite
 
 | ID | hypothesis | status | cost to first answer | file | notes |
 |---|---|---|---|---|---|
-| H1 | Lower-division football is less efficiently priced | **`pre-registered`** (2026-08-17) | zero new data; graded 2015-16 → 2024-25, ~30–75 min locally | `H1-lower-division-inefficiency.md` | ⚠️ overround *rises* with tier — the headwind points the wrong way. Pinnacle pair coverage measured at 97.3% lower / 99.4% upper, so it is answerable |
+| H1 | Lower-division football is less efficiently priced | **`settled` — SUPPORTED** (2026-08-17) | run, ~50 min | `H1-lower-division-inefficiency.md` → `docs/H1_RESULT.md` | 🟢 lower stratum CLV **1.0083**, 52.53% shortened, 9,920 bets, p<0.0001. **But** tier 5 (the thinnest market of all) shows nothing, ROI is worse than random, and the data was already seen. Supported by its test, unexplained by its mechanism |
 | H2 | Derived markets (**O/U 2.5 only** — see below) | `proposed` | zero new data for O/U; new ingest for the rest | `H2-derived-markets.md` | reuses the Poisson head, which has never been graded for betting. Blocked on the n-outcome work |
 | H3 | Line movement is predictable (pre-close → close) | `proposed` | **zero new data** for the free form | `H3-line-movement.md` | strongest published evidence; targets the market, not the match. CLV is the objective rather than a proxy, so it converges fast |
 | H4 | Betfair AU/NZ niche leagues (AFL, NRL, NBL, BBL) | `proposed` | new ingest, **source unverified** | `H4-exchange-niche-leagues.md` | best capacity-adjusted option — the exchange does not ban winners. The only one with a genuinely clean holdout |
