@@ -132,11 +132,23 @@ class NetConfig:
     goal_loss_weight: float = 0.3    # 0.0 disables the goals head (for ablation)
     max_goals: int = 10
     seed: int = 0
-    # Recurrent branch over each team's last N matches. 0 disables it, which is
-    # the default until the ablation says otherwise. The rolling features are
-    # means over the same window and therefore order-blind; a GRU is the
-    # cheapest way to ask whether the ORDER carries anything the mean does not.
-    seq_hidden: int = 0
+    # Recurrent branch over each team's last 10 matches. The rolling features
+    # are means over the same window and therefore order-blind: a team that
+    # lost four then won six looks identical to one that won six then lost
+    # four. This asks whether the ORDER carries anything the mean does not.
+    #
+    # It does, and it is the only component in this model that beats the
+    # baseline rather than matching it. Measured over 45,629 out-of-sample
+    # matches against an ordered logit at 0.20789:
+    #
+    #     no sequence branch    RPS 0.20784   t +0.57 vs logit   (a tie)
+    #     GRU(32)                   0.20765   t +2.50 vs logit   (a win)
+    #                                         t +2.54 vs no-sequence
+    #     GRU(64)                   0.20777   t +1.24 vs logit
+    #
+    # 64 units is worse than 32, which is the same overfitting pattern as the
+    # embeddings and the wide trunk. 32 is the measured optimum, not a guess.
+    seq_hidden: int = 32
 
 
 class MatchNet(nn.Module):

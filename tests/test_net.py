@@ -157,7 +157,7 @@ def test_vocab_separates_same_named_teams_in_different_countries():
 def test_forward_produces_the_right_shapes_and_positive_rates():
     df = toy(200)
     v = build_vocab(df)
-    cfg = NetConfig(members=3, hidden=16)
+    cfg = NetConfig(seq_hidden=0, members=3, hidden=16)
     m = MatchNet(4, v, cfg)
     x = torch.zeros(7, 4)
     ids = torch.zeros(7, dtype=torch.long)
@@ -172,7 +172,7 @@ def test_embeddings_can_be_switched_off_for_ablation(team_dim, league_dim):
     df = toy(300)
     v = build_vocab(df)
     X = np.zeros((len(df), 3))
-    cfg = NetConfig(team_dim=team_dim, league_dim=league_dim, members=2,
+    cfg = NetConfig(seq_hidden=0, team_dim=team_dim, league_dim=league_dim, members=2,
                     hidden=16, max_epochs=3, patience=2)
     model, meta = train_net(df, X, v, cfg)
     out = predict(model, df, X, v, meta)
@@ -197,7 +197,7 @@ def test_training_validation_split_is_temporal_not_random():
 
     v = build_vocab(clean)
     X = np.random.default_rng(0).normal(size=(len(clean), 3))
-    cfg = NetConfig(members=2, hidden=24, max_epochs=6, patience=6)
+    cfg = NetConfig(seq_hidden=0, members=2, hidden=24, max_epochs=6, patience=6)
 
     _, m_clean = train_net(clean, X, v, cfg)
     _, m_bad = train_net(poisoned, X, v, cfg)
@@ -215,7 +215,7 @@ def test_the_net_learns_something_on_data_with_known_structure():
     # Embeddings are OFF by default (they overfit on the real corpus -- see
     # NetConfig). This test is precisely about whether they CAN learn team
     # strength when there is nothing else, so it turns them on explicitly.
-    cfg = NetConfig(team_dim=12, members=4, hidden=32, max_epochs=40,
+    cfg = NetConfig(seq_hidden=0, team_dim=12, members=4, hidden=32, max_epochs=40,
                     patience=8, lr=3e-3)
     model, meta = train_net(df, X, v, cfg)
     out = predict(model, df, X, v, meta)
@@ -230,7 +230,7 @@ def test_goal_head_predicts_plausible_scoring_rates():
     df = toy(3000, seed=8)
     v = build_vocab(df)
     X = np.zeros((len(df), 1))
-    model, meta = train_net(df, X, v, NetConfig(team_dim=12, members=4, hidden=32,
+    model, meta = train_net(df, X, v, NetConfig(seq_hidden=0, team_dim=12, members=4, hidden=32,
                                                 max_epochs=40, patience=8, lr=3e-3))
     out = predict(model, df, X, v, meta)
     mean_rates = out["goal_rates"].mean(axis=0)
@@ -243,7 +243,7 @@ def test_disabling_the_goal_head_still_trains():
     df = toy(500)
     v = build_vocab(df)
     X = np.zeros((len(df), 2))
-    cfg = NetConfig(goal_loss_weight=0.0, members=2, hidden=16,
+    cfg = NetConfig(seq_hidden=0, goal_loss_weight=0.0, members=2, hidden=16,
                     max_epochs=4, patience=3)
     model, meta = train_net(df, X, v, cfg)
     assert np.isfinite(meta["best_val_ce"])
@@ -253,9 +253,22 @@ def test_training_is_reproducible_for_a_fixed_seed():
     df = toy(800)
     v = build_vocab(df)
     X = np.random.default_rng(0).normal(size=(len(df), 3))
-    cfg = NetConfig(members=2, hidden=16, max_epochs=5, patience=5, seed=42)
+    cfg = NetConfig(seq_hidden=0, members=2, hidden=16, max_epochs=5, patience=5, seed=42)
     m1, meta1 = train_net(df, X, v, cfg)
     m2, meta2 = train_net(df, X, v, cfg)
     p1 = predict(m1, df, X, v, meta1)["hda"]
     p2 = predict(m2, df, X, v, meta2)["hda"]
     assert np.allclose(p1, p2), "same seed must give the same model"
+
+
+def test_default_config_requires_sequences_and_says_so():
+    """The shipped default carries a GRU branch, because it is the only
+    component measured to beat the baseline rather than match it. That means
+    the default model genuinely needs a sequence tensor, and calling it
+    without one must fail loudly rather than silently drop the branch."""
+    df = toy(200)
+    v = build_vocab(df)
+    X = np.zeros((len(df), 2))
+    assert NetConfig().seq_hidden == 32
+    with pytest.raises(ValueError, match="seq_hidden"):
+        train_net(df, X, v, NetConfig(max_epochs=1, patience=1))

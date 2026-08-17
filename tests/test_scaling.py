@@ -80,7 +80,7 @@ def test_net_is_broadly_invariant_to_rescaling_a_feature():
     to standardize would diverge far beyond this."""
     df, X = toy(1200)
     v = build_vocab(df)
-    cfg = NetConfig(members=2, hidden=24, max_epochs=12, patience=6, seed=0)
+    cfg = NetConfig(seq_hidden=0, members=2, hidden=24, max_epochs=12, patience=6, seed=0)
 
     m1, meta1 = train_net(df, X, v, cfg)
     p1 = predict(m1, df, X, v, meta1)["hda"]
@@ -143,7 +143,7 @@ def test_net_scaler_excludes_the_validation_tail():
     X[cut:, 0] += 400.0             # make the tail wildly different
 
     v = build_vocab(df)
-    _, meta = train_net(df, X, v, NetConfig(members=2, hidden=16,
+    _, meta = train_net(df, X, v, NetConfig(seq_hidden=0, members=2, hidden=16,
                                             max_epochs=2, patience=2))
     assert meta["mu"][0] == pytest.approx(X[:cut, 0].mean(), abs=1e-6)
     assert abs(meta["mu"][0] - X[:, 0].mean()) > 1.0

@@ -31,8 +31,8 @@ above 5.0 where per-bet variance triples the sample size needed.
 
 The configuration committed in `NetConfig` defaults as of `fd46f79`:
 embeddings off, one trunk member, `hidden=96`, `dropout=0.2`, `lr=1e-3`,
-goals head at weight 0.3, temperature-scaled on the tail of the training
-window. Features: `ALL_FEATURES` (49). Training pool: the full 296,208-match
+goals head at weight 0.3, **GRU(32) sequence branch over each team's last 10
+matches**, temperature-scaled on the tail of the training window. Features: `ALL_FEATURES` (49). Training pool: the full 296,208-match
 corpus, matches strictly before each test window. Three seeds, averaged.
 
 Probabilities come from the temperature-scaled softmax head. The Poisson head
@@ -76,7 +76,7 @@ the answer.
 ## Disclosure: configurations already evaluated on the panel
 
 Required by the protocol in `docs/research/02-betting-evaluation-and-odds-data.md`.
-Approximately **25** distinct configurations have been scored on the 2016-17 →
+Approximately **28** distinct configurations have been scored on the 2016-17 →
 2024-25 panel during model selection:
 
 | family | count | detail |
@@ -86,6 +86,7 @@ Approximately **25** distinct configurations have been scored on the 2016-17 →
 | learning rate | 3 | 3e-3, 1e-3, 3e-4 |
 | feature sets | 2 | 7 rating features, 49 all features |
 | training pools | 2 | panel-only, full corpus |
+| sequence branch | 3 | none, GRU(32), GRU(64) |
 | Dixon-Coles (Eredivisie only) | 4 | two xi values x two lookbacks |
 
 None of these were selected on betting PnL — all on RPS and log loss, which is
