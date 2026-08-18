@@ -1,0 +1,4 @@
+predicted_at,match_id,kickoff,div,league,season,home_raw,away_raw,home_key,away_key,p_home,p_draw,p_away,bfeh,bfed,bfea,b365h,b365d,b365a,maxh,maxd,maxa,avgh,avgd,avga
+2026-08-18T14:58:42,SP1|20260819|atl madrid|malaga,2026-08-19 20:00,SP1,Spain La Liga,2026-27,Atl. Madrid,Malaga,atl madrid,malaga,0.2993767121208611,0.2938248675009767,0.4067984203781621,1.35,5.6,11.5,1.33,5.25,9.5,1.33,5.5,11.5,1.3,5.27,10.19
+2026-08-18T14:58:42,E2|20260820|sheffield wed|bradford city,2026-08-20 20:00,E2,England League One,2026-27,Sheffield Wed,Bradford City,sheffield wed,bradford city,0.4672025522064054,0.2625745332887477,0.270222914504847,2.52,3.55,2.94,2.4,3.3,2.7,2.55,3.5,2.75,2.44,3.36,2.68
+2026-08-18T14:58:42,SP1|20260820|rayo vallecano|alaves,2026-08-20 20:00,SP1,Spain La Liga,2026-27,Rayo Vallecano,Alaves,rayo vallecano,alaves,0.20467910899006478,0.2739376294385036,0.5213832615714317,2.3,3.1,3.95,2.25,3.0,3.6,2.3,3.15,3.75,2.23,2.99,3.52

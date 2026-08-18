@@ -18,4 +18,20 @@ beating it is if anything harder. CLV below is a like-for-like exchange ratio.
 and that would absorb most of the price advantage. CLV is immune to it, since
 both legs are exchange prices and the commission cancels in the ratio.
 
-_No prediction files yet._
+## Provenance
+
+Each file's commit time against the earliest kickoff it predicts. A file
+committed at or after any of its own kickoffs is not graded at all.
+
+**The newest file normally shows `uncommitted` here, and that is correct.**
+Grading runs before the commit step, so the file this run just wrote is still
+untracked while this table is being built. It is committed moments later, in
+the same workflow step that commits this ledger, and grades normally from the
+next run onward. Nothing needs fixing.
+
+```
+          file  rows committed_at       first_kickoff      status
+2026-08-18.csv     3         None 2026-08-19 20:00:00 uncommitted
+```
+
+_No prediction file has passed the commit-before-kickoff check yet._
