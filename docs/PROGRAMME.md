@@ -20,7 +20,7 @@
 
 ⚠️ **"Converging", not "independent", and the distinction is this session's own lesson applied one level up.** The three share a corpus, an era and overlapping models — H3's features include the pre-close prices, and H3's direct fit was measured as *equivalent* to the net's incidental signal, which is the opposite of independence. The four price ladders were correctly called "one result seen from four angles"; so is this. Convergence here means the same market resisted three different questions, not that three separate experiments agreed.
 
-**Still true and unchanged:** the forward workflow is live and verified on a real runner (`tracsj/match-predictor`, private, default branch `master`); Pinnacle is gone from the 2026/27 schema; the exchange close replaces it going forward. Runner-only bugs and cold-cache timings are further down.
+**Still true and unchanged:** the forward workflow is live and verified on a real runner (`tracsj/match-predictor`, default branch `master`); Pinnacle is gone from the 2026/27 schema; the exchange close replaces it going forward. Runner-only bugs and cold-cache timings are further down.
 
 **A methods caveat that applies to every z-statistic quoted above.** All the shortening-rate tests use `sqrt(p(1-p)/n)`, which assumes bets are independent. They are not: this repo's own `bootstrap_ci` resamples **matchdays** precisely because same-day bets share news and market-wide moves. Clustering cannot overturn z = 7–14 (H1 in-sample, H3), but it plausibly matters for the two marginal results — Phase 6 at p = 0.018 and H1's out-of-sample at p = 0.011 — which are already the two labelled "narrow" and "inconclusive by floor". **A day-clustered shortening test is queued as a methods item**, not run tonight.
 
