@@ -19,11 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-NOTE ON DATA. This licence covers the code in this repository. It does not
-cover, and this repository does not redistribute, the match and odds data the
-pipeline consumes. Fixture, lineup and odds data comes from the SportMonks API
-under their terms; historical results and closing prices come from
-football-data.co.uk under theirs. Bring your own credentials and data.

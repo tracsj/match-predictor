@@ -74,6 +74,8 @@ uv run python -c "import torch; print(torch.__version__)"
 
 Python 3.12, managed by `uv`. `.env` holds `SPORTMONKS_API_TOKEN` and is gitignored.
 
+**Bring your own data.** The MIT licence covers the code here and nothing else. This repository does not redistribute the match or odds data the pipeline consumes: fixtures, lineups and odds come from the SportMonks API under their terms, and historical results and closing prices from football-data.co.uk under theirs. `data/` and `models/` are gitignored for that reason, not to save space.
+
 ## v1
 
 The original build takes a player → team → Poisson route: ridge regression on `log1p(player goals)`, scaled by expected minutes, summed to a team λ, converted to W/D/L on a Poisson grid. It still runs — `v1/data` is a relative symlink to `data/`, so the scripts resolve their paths unchanged.
