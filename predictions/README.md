@@ -42,3 +42,15 @@ excluded, never averaged in.
 Prices are recorded because CLV needs the price that could actually have been
 taken. Without them these files could not answer the only question they exist
 to answer.
+
+## Where the first three files came from
+
+`2026-08-18.csv`, `2026-08-21.csv` and `2026-08-25.csv` were written and
+committed by scheduled runs in **`tracsj/match-predictor-archive`** — the
+private repository this one was published from on 2026-08-27. Publishing
+rewrote the history, so their commit SHAs here are new; they were carried
+across with `git cherry-pick` and their original committer dates preserved,
+which is what `src/grade.py` reads. The runs that produced them are
+`32145154725`, `32509613714` and `32856896845`, and the archive is the copy
+where a runner recorded those timestamps rather than a laptop. Every file
+after `2026-08-25.csv` was committed by this repository's own workflow.
