@@ -79,7 +79,11 @@ def clv_row(name: str, df: pd.DataFrame, probs: np.ndarray, pick_min=False) -> d
     bets = simulate(sub, probs, PINNACLE_PRE, RULE)
     if bets.empty:
         return {"arm": name, "n_bets": 0}
-    rep = clv_report(bets, closing_price_for_bets(bets, sub))
+    # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+    # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+    # null as a standard is in docs/H1_RESULT.md.
+    rep = clv_report(bets, closing_price_for_bets(bets, sub),
+                     null_rate=0.5, null_ratio=1.0)
     return {"arm": name, "n_bets": rep["n"], "mean_ratio": rep["mean_ratio"],
             "median_ratio": rep["median_ratio"], "pct_shortened": rep["pct_shortened"],
             "binom_p": rep["binom_pvalue"]}

@@ -243,7 +243,11 @@ def main() -> None:
             b = simulate(clv_panel, sharp, ps, all_in)
             if b.empty:
                 continue
-            r = clv_report(b, closing_price_for_bets(b, clv_panel))
+            # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+            # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+            # null as a standard is in docs/H1_RESULT.md.
+            r = clv_report(b, closing_price_for_bets(b, clv_panel),
+                           null_rate=0.5, null_ratio=1.0)
             crows.append({"taken_at": ps.label, "n": r["n"],
                           "mean_ratio": r["mean_ratio"],
                           "median_ratio": r["median_ratio"],

@@ -111,7 +111,11 @@ def clv_for(df: pd.DataFrame, probs: np.ndarray) -> tuple[dict, np.ndarray]:
     if bets.empty:
         return {"n": 0, "mean_ratio": float("nan")}, np.array([])
     close = closing_price_for_bets(bets, sub)
-    rep = clv_report(bets, close)
+    # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+    # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+    # null as a standard is in docs/H1_RESULT.md.
+    rep = clv_report(bets, close,
+                     null_rate=0.5, null_ratio=1.0)
     ratio = (bets["odds"].to_numpy(float) / np.asarray(close, float))
     return rep, ratio[np.isfinite(ratio)]
 

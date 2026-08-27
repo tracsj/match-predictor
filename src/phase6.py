@@ -142,7 +142,11 @@ def main() -> None:
         if bets.empty:
             clv_rows.append({"taken_at": ps.label, "n_bets": 0})
             continue
-        r = clv_report(bets, closing_price_for_bets(bets, sub))
+        # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+        # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+        # null as a standard is in docs/H1_RESULT.md.
+        r = clv_report(bets, closing_price_for_bets(bets, sub),
+                       null_rate=0.5, null_ratio=1.0)
         clv_rows.append({"taken_at": ps.label, "n_bets": len(bets),
                          "mean_ratio": r["mean_ratio"],
                          "pct_shortened": r["pct_shortened"],

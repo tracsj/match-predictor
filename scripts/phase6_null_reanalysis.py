@@ -89,7 +89,11 @@ def main() -> None:
     mask = test[need].notna().all(axis=1).to_numpy()
     sub = test[mask].reset_index(drop=True)
     bets = simulate(sub, p[mask], PINNACLE_PRE, RULE)
-    rep = clv_report(bets, closing_price_for_bets(bets, sub))
+    # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+    # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+    # null as a standard is in docs/H1_RESULT.md.
+    rep = clv_report(bets, closing_price_for_bets(bets, sub),
+                     null_rate=0.5, null_ratio=1.0)
 
     print()
     print("-" * 78)
@@ -141,7 +145,8 @@ def main() -> None:
         if b.empty:
             continue
         close = closing_price_for_bets(b, s)
-        r = clv_report(b, close)
+        r = clv_report(b, close,
+                       null_rate=0.5, null_ratio=1.0)
         arr = close.to_numpy(float)
         bet_odds = b["odds"].to_numpy(float)[np.isfinite(arr) & (arr > 0)]
 

@@ -86,7 +86,11 @@ def main() -> None:
         if bets.empty:
             rows.append({"stratum": name, "n_bets": 0})
             continue
-        rep = clv_report(bets, closing_price_for_bets(bets, sub))
+        # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+        # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+        # null as a standard is in docs/H1_RESULT.md.
+        rep = clv_report(bets, closing_price_for_bets(bets, sub),
+                         null_rate=0.5, null_ratio=1.0)
         rows.append({"stratum": name, "n_bets": rep["n"],
                      "mean_ratio": rep["mean_ratio"],
                      "median_ratio": rep["median_ratio"],
@@ -113,7 +117,8 @@ def main() -> None:
             continue
         close = closing_price_for_bets(bets, sub).to_numpy(float)
         keep_b = np.isfinite(close) & (close > 0)
-        rep = clv_report(bets, closing_price_for_bets(bets, sub))
+        rep = clv_report(bets, closing_price_for_bets(bets, sub),
+                         null_rate=0.5, null_ratio=1.0)
         bet_odds = bets["odds"].to_numpy(float)[keep_b]
         sims = np.array([matched_null(sub, bet_odds, seed=s) for s in range(200)])
         sims = sims[np.isfinite(sims)]

@@ -46,6 +46,7 @@ import argparse
 import subprocess
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.data.footballdata import OUT_DIR, REPO_ROOT
@@ -67,6 +68,43 @@ CLOSE_SETS = [
     (MARKET_MAX_CLOSE, "optimistic bound"),
     (MARKET_AVG_CLOSE, "softer benchmark, for coverage"),
 ]
+
+
+def measured_shortening_null(df: pd.DataFrame) -> tuple[float, int]:
+    """How often a band-eligible selection shortened, on these same rows.
+
+    THE NULL IS NOT 50%, and testing against 50% is the error that flipped the
+    sign of this project's founding CLV conclusion. An overround that tightens
+    toward kickoff means prices LENGTHEN by default, so a selection picked at
+    random inside the rule's odds band shortens less than half the time. On the
+    Pinnacle ladder that rate measured 45-48%; against 0.5 a real effect reads
+    as nothing.
+
+    The exchange ladder graded here has NO historical measurement and cannot
+    get one: `bfeh/bfed/bfea` are absent from the results files entirely and
+    arrive only through `fixtures.csv`, going forward. So the null is measured
+    from the settled forward rows themselves -- every (row, outcome) cell the
+    rule could legally have bet, whether or not it did. It is not imported from
+    Pinnacle, whose margin is four times the exchange's and whose tightening is
+    therefore a poor guide to this ladder's.
+
+    Unmatched on odds, deliberately. The odds-matched and unmatched nulls
+    agreed to within 0.002 in the H1 window and 0.004 on Phase 6's, and at this
+    sample size decile matching would add more noise than it removes.
+
+    Both legs are filtered `> 1.0`: 29 cells in this feed carry a price at or
+    below 1.0, which is missing data wearing a number and invisible to notna().
+    """
+    pre = df[EXCHANGE_PRE.cols].to_numpy(dtype=float)
+    close = df[EXCHANGE_CLOSE.cols].to_numpy(dtype=float)
+    ok = (np.isfinite(pre) & np.isfinite(close)
+          & (pre > 1.0) & (close > 1.0)
+          & (pre >= RULE.min_odds) & (pre <= RULE.max_odds))
+    n = int(ok.sum())
+    if n < 30:
+        return float("nan"), n
+    ratio = pre[ok] / close[ok]
+    return float((ratio > 1.0).mean()), n
 
 
 def assert_full_history() -> None:
@@ -315,29 +353,57 @@ def build_report(verbose: bool = True) -> str:
     w("## Closing-line value")
     w("")
     w("Bet at the pre-close exchange price recorded at prediction time; grade against")
-    w("the exchange close of the same selection. A ratio at or below 1.0 means the")
-    w("selections sat on the wrong side of the market's own movement.")
+    w("the exchange close of the same selection.")
+    w("")
+    w("**Read `pct_shortened` against `null_rate`, never against 50%.** The overround")
+    w("tightens toward kickoff, so prices lengthen by default and a selection picked at")
+    w("random inside the rule's odds band shortens less than half the time. `null_rate`")
+    w("is that rate, measured on these same settled rows over every cell the rule could")
+    w("legally have bet, and `binom_p` tests against it. Testing against 0.5 instead is")
+    w("what put a withdrawn reading into `docs/PHASE6_RESULT.md`.")
+    w("")
+    w("The null is measured here rather than imported: the exchange pre-close arrives")
+    w("only through `fixtures.csv` going forward, so this ladder has no history to")
+    w("measure against, and Pinnacle's drift is a poor proxy at four times the margin.")
+    w("It is unmatched on odds, which cost 0.002-0.004 where both were computed.")
     w("")
     clv_rows = []
+    null_note = None
     need = EXCHANGE_PRE.cols + EXCHANGE_CLOSE.cols
     if all(c in settled.columns for c in need):
         m = settled[need].notna().all(axis=1).to_numpy()
         if m.sum() >= 10:
             sub = settled[m].reset_index(drop=True)
+            null_rate, n_cells = measured_shortening_null(sub)
+            null_note = (n_cells, null_rate)
             bets = simulate(sub, p[m], EXCHANGE_PRE, RULE)
-            if len(bets):
-                r = clv_report(bets, closing_price_for_bets(bets, sub, CLOSE_FOR_EXCHANGE))
+            if len(bets) and np.isfinite(null_rate):
+                r = clv_report(bets, closing_price_for_bets(bets, sub, CLOSE_FOR_EXCHANGE),
+                               null_rate=null_rate, null_ratio=1.0)
                 clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": len(bets),
                                  "mean_ratio": r["mean_ratio"],
                                  "pct_shortened": r["pct_shortened"],
+                                 "null_rate": r["null_rate"],
+                                 "excess_pp": 100 * (r["pct_shortened"] - r["null_rate"]),
                                  "binom_p": r["binom_pvalue"]})
             else:
-                clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": 0})
+                clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": len(bets)})
     w("```")
     w(_fmt(pd.DataFrame(clv_rows)) if clv_rows
       else "  no usable pre-close/close pairs yet")
     w("```")
     w("")
+    if null_note is not None:
+        n_cells, null_rate = null_note
+        if np.isfinite(null_rate):
+            w(f"The null is itself an estimate, from **{n_cells}** eligible cells. At that")
+            w("count it carries a couple of points of sampling error of its own, which")
+            w("`binom_p` treats as exact and therefore reports as slightly too confident.")
+        else:
+            w(f"Only **{n_cells}** eligible cells so far, below the 30 needed to measure a")
+            w("null worth testing against. No p-value is reported rather than one against")
+            w("a null this project has measured to be wrong.")
+        w("")
 
     w("## ROI, led by the sharpest price")
     w("")

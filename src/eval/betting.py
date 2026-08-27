@@ -357,7 +357,9 @@ def required_sample_size(mean_odds: float, edge: float = 0.02,
     return int(np.ceil((z * sigma / edge) ** 2))
 
 
-def clv_report(bets: pd.DataFrame, closing_odds: pd.Series) -> dict:
+def clv_report(bets: pd.DataFrame, closing_odds: pd.Series, *,
+               null_rate: float | None = None,
+               null_ratio: float | None = None) -> dict:
     """Closing-line value: did the price you took shorten by kickoff?
 
     The ratio (taken odds / closing odds) predicts realised level-stakes yield
@@ -366,27 +368,53 @@ def clv_report(bets: pd.DataFrame, closing_odds: pd.Series) -> dict:
 
     `closing_odds` must be the closing price for the *same selection* the bet
     was placed on, aligned to the bets frame.
+
+    BOTH NULLS ARE REQUIRED, and that is the point of this signature. Every CLV
+    number this project reported before 2026-08-17 was tested against
+    null_rate=0.5 and null_ratio=1.0 -- the assumption that the pre-close and
+    the close are on average the same price. Measured, they are not: an
+    overround that tightens toward kickoff means prices LENGTHEN by default,
+    and a randomly chosen band-eligible selection shortened only 45-48% of the
+    time on the Pinnacle ladder. Against 0.5 a real effect reads as nothing.
+    Correcting the null flipped the sign of the founding study's conclusion.
+
+    So there is no default. A caller that has not measured its own ladder's
+    drift must say `null_rate=0.5` in its own source, where the assumption is
+    visible, rather than inheriting it silently from here. Both nulls come back
+    in the returned dict so a table can never print a p-value without being
+    able to print what it was tested against.
     """
+    if null_rate is None or null_ratio is None:
+        raise TypeError(
+            "clv_report requires null_rate and null_ratio. Measure the drift of "
+            "the ladder you are grading -- see scripts/clv_null_calibration.py. "
+            "Pass null_rate=0.5, null_ratio=1.0 explicitly only if you mean to "
+            "assume the pre-close and the close are on average the same price."
+        )
+
     if bets.empty:
-        return {"n": 0, "mean_ratio": float("nan"), "pct_shortened": float("nan")}
+        return {"n": 0, "mean_ratio": float("nan"), "pct_shortened": float("nan"),
+                "null_rate": float(null_rate), "null_ratio": float(null_ratio)}
 
     taken = bets["odds"].to_numpy(dtype=float)
     close = np.asarray(closing_odds, dtype=float)
     ok = np.isfinite(taken) & np.isfinite(close) & (close > 0)
     if not ok.any():
-        return {"n": 0, "mean_ratio": float("nan"), "pct_shortened": float("nan")}
+        return {"n": 0, "mean_ratio": float("nan"), "pct_shortened": float("nan"),
+                "null_rate": float(null_rate), "null_ratio": float(null_ratio)}
 
     ratio = taken[ok] / close[ok]
     shortened = ratio > 1.0            # got a bigger price than the close
-    t = stats.ttest_1samp(ratio, 1.0) if ok.sum() > 1 else None
-    # Binomial test against a coin flip: is the shortening rate better than chance?
-    binom = stats.binomtest(int(shortened.sum()), int(ok.sum()), 0.5)
+    t = stats.ttest_1samp(ratio, null_ratio) if ok.sum() > 1 else None
+    binom = stats.binomtest(int(shortened.sum()), int(ok.sum()), null_rate)
 
     return {
         "n": int(ok.sum()),
         "mean_ratio": float(ratio.mean()),
         "median_ratio": float(np.median(ratio)),
         "pct_shortened": float(shortened.mean()),
+        "null_rate": float(null_rate),
+        "null_ratio": float(null_ratio),
         "t_stat": float(t.statistic) if t is not None else float("nan"),
         "t_pvalue": float(t.pvalue) if t is not None else float("nan"),
         "binom_pvalue": float(binom.pvalue),

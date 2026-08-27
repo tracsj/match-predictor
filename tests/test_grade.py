@@ -131,3 +131,61 @@ def test_a_real_settled_match_joins_and_grades(predictions_dir, monkeypatch):
     text = grade.build_report(verbose=False)
     assert "Results landed: **1**" in text
     assert "Awaiting result: **0**" in text
+
+
+# --------------------------------------------------------------------------
+# The null the ledger tests CLV against
+# --------------------------------------------------------------------------
+
+def _drift_frame(pre_close_pairs) -> pd.DataFrame:
+    """One row per (pre, close) triple, in the exchange columns grade.py reads."""
+    pre = [p for p, _ in pre_close_pairs]
+    close = [c for _, c in pre_close_pairs]
+    return pd.DataFrame({
+        "bfeh": [p[0] for p in pre], "bfed": [p[1] for p in pre],
+        "bfea": [p[2] for p in pre],
+        "bfech": [c[0] for c in close], "bfecd": [c[1] for c in close],
+        "bfeca": [c[2] for c in close],
+    })
+
+
+def test_the_measured_null_counts_only_cells_the_rule_could_have_bet():
+    """The null is the whole point, so it gets a case with a known answer.
+
+    Ten in-band rows carry thirty cells. Twelve of them are priced 2.0 against
+    a close of 1.8 and so shortened; the other eighteen closed at 2.2 and
+    lengthened. Twelve over thirty is 0.40 — worked out here rather than read
+    back from the function, because an expectation taken from the thing under
+    test agrees with it whatever it returns.
+
+    Three poison rows follow, and every cell in them would shorten. One is
+    priced below the rule's floor, one above its ceiling, and one closes at
+    exactly 1.0 — missing data wearing a number, which `notna()` does not
+    catch. If any filter is missing the rate climbs to 21/39 and the cell
+    count reports 39, so a broken filter cannot return the right answer.
+    """
+    rows = [((2.0, 2.0, 2.0), (1.8, 1.8, 1.8))] * 4         # 12 shortened cells
+    rows += [((2.0, 2.0, 2.0), (2.2, 2.2, 2.2))] * 6        # 18 lengthened cells
+    rate, n_cells = grade.measured_shortening_null(_drift_frame(rows))
+    assert n_cells == 30
+    assert rate == pytest.approx(0.40)
+
+    poisoned = rows + [
+        ((1.2, 1.2, 1.2), (1.1, 1.1, 1.1)),                 # below min_odds
+        ((8.0, 8.0, 8.0), (7.0, 7.0, 7.0)),                 # above max_odds
+        ((2.0, 2.0, 2.0), (1.0, 1.0, 1.0)),                 # a price that is not a price
+    ]
+    rate2, n_cells2 = grade.measured_shortening_null(_drift_frame(poisoned))
+    assert n_cells2 == 30, "poison rows must be excluded, not counted"
+    assert rate2 == pytest.approx(0.40)
+
+
+def test_the_measured_null_reports_no_rate_when_there_is_too_little_to_measure():
+    """Below the floor it returns NaN rather than a rate built on nine cells,
+    and the ledger prints the cell count instead of a p-value. A null measured
+    from almost nothing is worse than an admitted absence: it looks like a
+    measurement."""
+    rows = [((2.0, 2.0, 2.0), (1.8, 1.8, 1.8))] * 3         # 9 cells, under 30
+    rate, n_cells = grade.measured_shortening_null(_drift_frame(rows))
+    assert n_cells == 9
+    assert pd.isna(rate)

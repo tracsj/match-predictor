@@ -52,14 +52,15 @@ def _bets(odds, selections, match_ids):
 def test_clv_ratio_is_taken_over_closing():
     # Took 2.20, closed 2.00 -> ratio 1.10, i.e. beat the close by 10%.
     bets = _bets([2.20], ["H"], ["m1"])
-    r = clv_report(bets, pd.Series([2.00]))
+    r = clv_report(bets, pd.Series([2.00]), null_rate=0.5, null_ratio=1.0)
     assert r["mean_ratio"] == pytest.approx(1.10)
     assert r["pct_shortened"] == pytest.approx(1.0)
 
 
 def test_clv_detects_a_price_that_drifted_out():
     # Took 2.00, closed 2.50: the market moved against the bet.
-    r = clv_report(_bets([2.00], ["H"], ["m1"]), pd.Series([2.50]))
+    r = clv_report(_bets([2.00], ["H"], ["m1"]), pd.Series([2.50]),
+                   null_rate=0.5, null_ratio=1.0)
     assert r["mean_ratio"] == pytest.approx(0.8)
     assert r["pct_shortened"] == pytest.approx(0.0)
 
@@ -67,19 +68,22 @@ def test_clv_detects_a_price_that_drifted_out():
 def test_clv_of_betting_at_the_close_is_exactly_one():
     # The tautology the pre-close price sets exist to avoid.
     odds = [2.0, 3.4, 5.5, 1.7]
-    r = clv_report(_bets(odds, ["H", "D", "A", "H"], list("abcd")), pd.Series(odds))
+    r = clv_report(_bets(odds, ["H", "D", "A", "H"], list("abcd")), pd.Series(odds),
+                   null_rate=0.5, null_ratio=1.0)
     assert r["mean_ratio"] == pytest.approx(1.0)
     assert r["pct_shortened"] == pytest.approx(0.0)
 
 
 def test_clv_ignores_unusable_closing_prices_rather_than_inventing_them():
-    r = clv_report(_bets([2.2, 2.2], ["H", "H"], ["a", "b"]), pd.Series([2.0, np.nan]))
+    r = clv_report(_bets([2.2, 2.2], ["H", "H"], ["a", "b"]), pd.Series([2.0, np.nan]),
+                   null_rate=0.5, null_ratio=1.0)
     assert r["n"] == 1
     assert r["mean_ratio"] == pytest.approx(1.10)
 
 
 def test_clv_on_empty_bets_is_not_an_error():
-    assert clv_report(pd.DataFrame(), pd.Series(dtype=float))["n"] == 0
+    assert clv_report(pd.DataFrame(), pd.Series(dtype=float),
+                      null_rate=0.5, null_ratio=1.0)["n"] == 0
 
 
 # --------------------------------------------------------------------------
@@ -125,7 +129,7 @@ def test_pinnacle_pre_close_beats_its_own_close_about_half_the_time(panel):
     bets = simulate(panel, p, PINNACLE_PRE,
                     BetRule(min_ev=-1.0, min_odds=1.0, max_odds=1e6, name="all"))
     close = closing_price_for_bets(bets, panel)
-    r = clv_report(bets, close)
+    r = clv_report(bets, close, null_rate=0.5, null_ratio=1.0)
 
     assert r["n"] > 40_000
     assert r["mean_ratio"] == pytest.approx(1.0, abs=0.03)
@@ -147,7 +151,8 @@ def test_taking_the_best_pre_close_price_produces_positive_clv(panel):
     p = devig(panel[PINNACLE_PRE.cols].to_numpy(float), method="shin")
     bets = simulate(panel, p, MARKET_MAX_PRE,
                     BetRule(min_ev=-1.0, min_odds=1.0, max_odds=1e6, name="all"))
-    r = clv_report(bets, closing_price_for_bets(bets, panel))
+    r = clv_report(bets, closing_price_for_bets(bets, panel),
+                   null_rate=0.5, null_ratio=1.0)
 
     assert r["mean_ratio"] > 1.01, "best available price should beat the sharp close"
     assert r["pct_shortened"] > 0.5
@@ -167,7 +172,8 @@ def test_clv_and_roi_point_the_same_way_on_the_price_shopping_strategy(panel):
     assert len(bets) > 1000
 
     roi = bets["pnl"].sum() / bets["stake"].sum()
-    r = clv_report(bets, closing_price_for_bets(bets, panel))
+    r = clv_report(bets, closing_price_for_bets(bets, panel),
+                   null_rate=0.5, null_ratio=1.0)
     assert r["mean_ratio"] > 1.0
     assert roi > 0.0
 
@@ -219,3 +225,71 @@ def test_bets_are_graded_against_the_price_of_the_side_backed(panel):
         won = lookup.loc[row.match_id, "result"] == row.selection
         assert row.won == won
         assert row.pnl == pytest.approx(expected_odds - 1 if won else -1.0)
+
+
+# --------------------------------------------------------------------------
+# The null itself, which was wrong in every CLV number this project reported
+# before 2026-08-17
+# --------------------------------------------------------------------------
+
+def test_clv_report_refuses_to_assume_a_null():
+    """No default, on purpose.
+
+    Testing CLV against a 50% shortening rate assumes the pre-close and the
+    close are on average the same price. Measured, they are not, and that
+    assumption flipped the sign of this project's founding conclusion. A caller
+    that wants it must say so in its own source.
+    """
+    bets = _bets([2.20], ["H"], ["m1"])
+    with pytest.raises(TypeError, match="requires null_rate and null_ratio"):
+        clv_report(bets, pd.Series([2.00]))
+    with pytest.raises(TypeError, match="requires null_rate and null_ratio"):
+        clv_report(bets, pd.Series([2.00]), null_rate=0.5)
+    with pytest.raises(TypeError, match="requires null_rate and null_ratio"):
+        clv_report(bets, pd.Series([2.00]), null_ratio=1.0)
+
+
+def test_the_binomial_p_actually_moves_with_the_null():
+    """The parameter has to reach the test, not just the returned dict.
+
+    Six of eight bets shortened. Against a null of 0.5 that is unremarkable;
+    against a null of 0.10 it is not; against a null of exactly 0.75 -- the
+    observed rate -- the two-sided p is 1.0 by definition. The three expected
+    values are written here independently rather than derived from the report,
+    because a check whose expectation comes from the thing under test stays
+    self-consistent for every value including the wrong one.
+    """
+    odds = [2.2] * 8
+    close = pd.Series([2.0] * 6 + [2.5] * 2)     # 6 shortened, 2 lengthened
+    bets = _bets(odds, ["H"] * 8, [f"m{i}" for i in range(8)])
+
+    at_half = clv_report(bets, close, null_rate=0.5, null_ratio=1.0)
+    at_tenth = clv_report(bets, close, null_rate=0.10, null_ratio=1.0)
+    at_observed = clv_report(bets, close, null_rate=0.75, null_ratio=1.0)
+
+    assert at_half["pct_shortened"] == pytest.approx(0.75)
+    assert at_half["binom_pvalue"] > 0.2
+    assert at_tenth["binom_pvalue"] < 1e-3
+    assert at_observed["binom_pvalue"] == pytest.approx(1.0)
+    # and the null used comes back, so no table can print a p without it
+    assert at_tenth["null_rate"] == pytest.approx(0.10)
+    assert at_tenth["null_ratio"] == pytest.approx(1.0)
+
+
+def test_the_t_test_uses_the_ratio_null_it_was_given():
+    """Same fault in ratio form: `ttest_1samp(ratio, 1.0)` is the 50% error's twin."""
+    odds = [2.2] * 10
+    # Five ratios of 2.2/2.0 = 1.10 and five of 2.2/2.2 = 1.00, so the mean is
+    # 1.05. That number is worked out here by hand rather than read back from
+    # the report, so the check can fail. The spread is deliberate too: a
+    # zero-variance sample makes the t-statistic undefined rather than zero.
+    close = pd.Series([2.0] * 5 + [2.2] * 5)
+    bets = _bets(odds, ["H"] * 10, [f"m{i}" for i in range(10)])
+
+    against_one = clv_report(bets, close, null_rate=0.5, null_ratio=1.0)
+    against_the_mean = clv_report(bets, close, null_rate=0.5, null_ratio=1.05)
+
+    assert against_one["mean_ratio"] == pytest.approx(1.05)
+    assert against_one["t_stat"] > 0
+    assert against_the_mean["t_stat"] == pytest.approx(0.0, abs=1e-9)
+    assert against_the_mean["t_pvalue"] == pytest.approx(1.0)

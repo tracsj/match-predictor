@@ -82,7 +82,11 @@ def main() -> None:
         if bets.empty:
             continue
         close = closing_price_for_bets(bets, sub)
-        rep = clv_report(bets, close)
+        # Legacy null, stated explicitly. These numbers are recorded in docs/ and
+        # 0.5/1.0 reproduces them exactly. The measured drift that supersedes this
+        # null as a standard is in docs/H1_RESULT.md.
+        rep = clv_report(bets, close,
+                         null_rate=0.5, null_ratio=1.0)
         ok = np.isfinite(close.to_numpy(float)) & (close.to_numpy(float) > 0)
         bet_odds = bets["odds"].to_numpy(float)[ok]
         sims = np.array([matched_null(sub, bet_odds, seed=s) for s in range(N_SIMS)])
@@ -111,7 +115,8 @@ def main() -> None:
         sub = graded[m].reset_index(drop=True)
         bets = simulate(sub, p[m], PINNACLE_PRE, RULE)
         close = closing_price_for_bets(bets, sub)
-        rep = clv_report(bets, close)
+        rep = clv_report(bets, close,
+                         null_rate=0.5, null_ratio=1.0)
         arr = close.to_numpy(float)
         bet_odds = bets["odds"].to_numpy(float)[np.isfinite(arr) & (arr > 0)]
         sims = np.array([matched_null(sub, bet_odds, seed=s) for s in range(N_SIMS)])
