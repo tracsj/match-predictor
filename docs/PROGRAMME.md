@@ -6,6 +6,14 @@
 
 ## Where we are — read this first
 
+**Session 2026-08-27.** The forward workflow was rescued from a publishing accident, and the CLV null correction finally reached the code. **Count unchanged at 49** — nothing here fitted a model or searched for edge.
+
+**The correction that had never been enacted.** The 2026-08-17 session established that testing CLV against a 50% shortening rate is wrong and wrote it into `CLAUDE.md`, `docs/` and three pre-registrations. `clv_report` went on hardcoding `binomtest(..., 0.5)` and `ttest_1samp(ratio, 1.0)` for ten days, so **every forward ledger this project has written tested the model against a coin flip.** Both nulls are now required keyword arguments with no default; every settled caller passes `0.5`/`1.0` explicitly and reproduces its recorded numbers unchanged (`h1_holdout_tiers.py` still prints lower 309 bets, 0.3819, +0.0674, z 2.55, p 0.0108). The ledger also stopped reprinting the withdrawn "wrong side of the market's own movement" gloss, which `src/grade.py` had been emitting on every run.
+
+**And the exchange ladder's null is nothing like Pinnacle's — 31.8% against 45–48%.** Measured on 415 band-eligible cells from the settled forward rows, with the mechanism measured beside it: the exchange pre-close book sums to **1.0603** against a close of **1.0213**, tightening in **88% of 167 rows**, because `bfe*` arrives through `fixtures.csv` at a median **21 hours** before kickoff rather than as a mature price. Odds-matching moves it by 0.0012 (`scripts/forward_matched_null.py`), so the gap is not a mix artifact. **Borrowing Pinnacle's number here would misstate the null by 13 points** — larger than any margin this project has claimed.
+
+**What that does to the forward CLV, stated as the early number it is.** Against 0.5 the ledger reported 0.4405 shortened at p = 0.44, which reads as nothing. Against the measured 0.3181 it is **+12.24pp**, two-proportion p **0.031** (binomial 0.019, which treats the null as exact). On **84 bets**, with days unclustered, and the graded bets sitting inside the null's own cells. **It clears nothing** — the project's bar is p < 0.01 — and the ledger says so in its own words. Watch it; do not build on it.
+
 **Last session: 2026-08-17 (third session that day).** Three hypotheses' worth of work landed: **H1 settled (supported, then heavily qualified), Phase 6's CLV reading withdrawn, and H3 settled (supported, and useless).** The count moved 47 → 49. **337 tests** green at close.
 
 **The through-line, and it is one finding wearing three hats.** Every CLV number this project had ever reported was tested against a null of 1.0 / 50% — the assumption that the pre-close and the close are on average the same price. **They are not.** Pinnacle's overround tightens toward kickoff every season, so prices lengthen by default and a randomly chosen band-eligible selection shortens only 45–48% of the time. Correcting that null changed the reading of everything it touched.
@@ -30,7 +38,11 @@ And **29 cells across 12 odds columns carry a price ≤ 1.0** — missing data w
 
 **Next, in order**
 
-1. **Check Tuesday's scheduled run (2026-08-18, 13:15 UTC) — still outstanding.** The 2026-08-17 session could not do this: the cron had not fired yet, and the four runs `gh run list` showed were all that evening's manual dispatches. It is the first run with a non-empty horizon, so the first to exercise training on a runner and the first to write a real `predictions/YYYY-MM-DD.csv`. Concretely: `gh run list --workflow=forecast.yml --limit 3`, then `gh run view <id> --log`, and confirm three things — the predict step reports a fixture count rather than "no upcoming fixtures", training completed inside the 120-minute timeout (unmeasured on 2 vCPUs; 4m05s locally), and `predictions/` gained a file. If it timed out, raise the runner rather than cutting seeds — see the registry ruling below.
+1. ~~**Check Tuesday's scheduled run.**~~ **Answered 2026-08-27 — three scheduled runs fired and all three succeeded**, in 14m39s, 13m39s and 14m29s against a 120-minute timeout. They wrote `2026-08-18.csv` (3 rows), `2026-08-21.csv` (165) and `2026-08-25.csv` (5). Training on a 2-vCPU runner is a non-issue.
+
+   **They landed in the wrong repository, which is the part worth knowing.** Publishing on 2026-08-27 rewrote the history into a new public `tracsj/match-predictor` and left those three commits in `tracsj/match-predictor-archive`, now private. They were cherry-picked across with their original committer dates preserved, because `grade.py` establishes provenance from `git log -1 --format=%cI` and a re-dated file is excluded from its own ledger; `predictions/README.md` names the archive and the three run ids. **The workflow was also never registered in the new repo** — pushing a file into `.github/workflows/` at repo-creation time does not trigger a scan, and Friday's cron would not have fired. A push touching the workflow file registered it. The archive's cron is disabled, so there is one live schedule again.
+
+   **What the first 169 settled predictions say.** The net scores RPS **0.2110** against the exchange close at **0.2121** — nominally ahead, on 169 matches, which is far too few to mean anything. ROI reads positive in all four price columns on 66–102 bets, and only `b365_close` has an interval clear of zero (+0.36, [0.023, 0.639]) — one column of four at that sample size is what noise looks like. CLV is the number that moved when the null was corrected, and it is covered below.
 
 2. **Day-cluster the shortening-rate test.** Every CLV z reported on 2026-08-17 assumes independent bets while `bootstrap_ci` already resamples matchdays. Re-derive Phase 6's p = 0.018 and H1's out-of-sample p = 0.011 with day clustering — the two marginal results — and state whether they survive. Cheap, and it touches `src/eval/betting.py` plus the two result files.
 
@@ -78,6 +90,8 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 ## The count
 
 **Configurations evaluated to date: 49.**
+
+**Reconciled 2026-08-27: the count holds at 49.** Two things ran and neither is a configuration. `scripts/forward_matched_null.py` samples prices and fits nothing — a control in the same sense as `h1_odds_matched_null.py`, already ruled on below. `src/grade.py`'s measured null recomputes a statistic over the forward ledger's existing, unchanged bet population; it is a new cut of a running record, not a new evaluation, and the bets it grades were committed by a workflow rather than selected by a search. Nothing tonight looked for edge.
 
 **+1 on 2026-08-17 (third session): the H1 tier-stratified run.** One configuration — inherited rule, inherited model, one pre-specified contrast — scored on CLV and ROI. It **passed its pre-registered test**, which is the first time anything here has. `docs/H1_RESULT.md` carries the tables and the diagnostics, and the diagnostics matter more than the verdict.
 
