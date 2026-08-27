@@ -87,13 +87,36 @@ the pipeline before the model.
 ## Closing-line value
 
 Bet at the pre-close exchange price recorded at prediction time; grade against
-the exchange close of the same selection. A ratio at or below 1.0 means the
-selections sat on the wrong side of the market's own movement.
+the exchange close of the same selection.
+
+**Read `pct_shortened` against `null_rate`, never against 50%.** The overround
+tightens toward kickoff, so prices lengthen by default and a selection picked at
+random inside the rule's odds band shortens less than half the time. `null_rate`
+is that rate, measured on these same settled rows over every cell the rule could
+legally have bet. Testing against 0.5 instead is what put a withdrawn reading
+into `docs/PHASE6_RESULT.md`.
+
+The null is measured here rather than imported. Pinnacle's pre-close was a
+mature price; this one is a Tuesday/Friday snapshot taken a day out, and the
+overround line below is what makes the difference legible rather than surprising.
 
 ```
-    taken_at  n_bets  mean_ratio  pct_shortened  binom_p
-exchange_pre      84      0.9915         0.4405   0.3261
+    taken_at  n_bets  mean_ratio  pct_shortened  null_rate  excess_pp  binom_p  two_prop_p
+exchange_pre      84      0.9915         0.4405     0.3181    12.2404   0.0189      0.0306
 ```
+
+**The mechanism, on these rows.** The pre-close book sums to
+1.0603 and the close to 1.0213, tightening in 88% of 167 rows.
+That is where the default lengthening comes from, and it is measured rather
+than assumed.
+
+**Treat this as an early number, not a finding.** The null is itself an
+estimate, from **415** eligible cells, and `binom_p` treats it as exact.
+`two_prop_p` does not, and is the one to read. The graded bets are a subset
+of those cells, which dilutes the null toward the model and makes the
+comparison conservative. Every p here also assumes bets are independent,
+while same-day bets share news and market-wide moves. Nothing here clears
+the p < 0.01 this project requires before claiming an edge.
 
 ## ROI, led by the sharpest price
 
