@@ -317,6 +317,41 @@ Bare `curl` works — no browser user-agent needed. UTF-8 BOM on column 1.
 SWZ), schema `Country,League,Date,Time,Home,Away,PSH,...`. Its `PSH/PSD/PSA` are
 **declared but 0/116 populated**. Not read by `src/data/fixtures.py`.
 
+### The exchange pre-close is a thin snapshot, and its drift is nothing like Pinnacle's
+
+Measured 2026-08-27, over the first 167 settled forward predictions. This is the
+fact that makes the forward ledger's CLV null believable rather than surprising.
+
+`BFEH/BFED/BFEA` reach the corpus only through `fixtures.csv`, collected Tuesday
+≤13:00 and Friday ≤17:00 UK — **a median 21 hours before kickoff**, against a
+Betfair market that is still thin. The book shows it:
+
+| | overround |
+|---|---|
+| exchange pre-close (`bfe*`, from `fixtures.csv`) | **1.0603** |
+| exchange close (`bfec*`) | **1.0213** |
+
+It tightens in **88% of rows**. So prices lengthen by default on this ladder,
+and only **31.81%** of band-eligible selections shortened — far below Pinnacle's
+45–48%, whose pre-close is a mature price rather than a day-out snapshot.
+
+**Do not import Pinnacle's null here.** Reading this ladder against 45–48%, or
+against 50%, misstates it by 13 to 18 points, which is larger than any margin
+this project has ever claimed.
+
+Odds-matching does not move it: matched 0.3169 against unmatched 0.3181, a gap
+of 0.0012 on this ladder's own cells. Re-derivable, and it should be re-run as
+the forward corpus grows:
+
+```bash
+PYTHONPATH=. uv run python scripts/forward_matched_null.py
+uv run python -m src.grade        # the overround line prints in docs/FORWARD_LEDGER.md
+```
+
+The second command is the durable one — `src/grade.py` now measures the
+overround both ways on every run, so this fact maintains itself rather than
+going stale in a document.
+
 ### `download_all` cannot refresh, and `_missing.json` is the worse half
 
 Measured 2026-08-17, and it is the failure that would have quietly hollowed out

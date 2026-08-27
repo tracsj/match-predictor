@@ -48,6 +48,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 from src.data.footballdata import OUT_DIR, REPO_ROOT
 from src.eval.betting import (
@@ -70,7 +71,7 @@ CLOSE_SETS = [
 ]
 
 
-def measured_shortening_null(df: pd.DataFrame) -> tuple[float, int]:
+def measured_shortening_null(df: pd.DataFrame) -> dict:
     """How often a band-eligible selection shortened, on these same rows.
 
     THE NULL IS NOT 50%, and testing against 50% is the error that flipped the
@@ -85,26 +86,70 @@ def measured_shortening_null(df: pd.DataFrame) -> tuple[float, int]:
     arrive only through `fixtures.csv`, going forward. So the null is measured
     from the settled forward rows themselves -- every (row, outcome) cell the
     rule could legally have bet, whether or not it did. It is not imported from
-    Pinnacle, whose margin is four times the exchange's and whose tightening is
-    therefore a poor guide to this ladder's.
+    Pinnacle, whose pre-close is a mature price and whose drift is therefore a
+    poor guide to a snapshot taken a day out.
 
-    Unmatched on odds, deliberately. The odds-matched and unmatched nulls
-    agreed to within 0.002 in the H1 window and 0.004 on Phase 6's, and at this
-    sample size decile matching would add more noise than it removes.
+    The overround comes back beside it, because it is the mechanism and it is
+    what makes the rate believable rather than surprising. Measured 2026-08-27,
+    the pre-close book runs about 1.06 against a close near 1.02: this ladder's
+    pre leg is a thin Tuesday/Friday snapshot at a median 21 hours out, not a
+    near-kickoff price, which is why its drift runs well past Pinnacle's.
+
+    The bets being graded are a SUBSET of these cells, which dilutes the null
+    toward the model and makes the comparison conservative. Leaving them in is
+    the H1 precedent and was fixed before any forward number existed; swapping
+    to the sharper bets-versus-complement version after seeing the result is
+    the pathology the pre-registration discipline exists to prevent.
+
+    Unmatched on odds. Measured on this ladder's own cells the odds-matched and
+    unmatched nulls agree to 0.0012, so decile matching buys nothing here and
+    at this sample size would add more noise than it removes.
 
     Both legs are filtered `> 1.0`: 29 cells in this feed carry a price at or
     below 1.0, which is missing data wearing a number and invisible to notna().
     """
     pre = df[EXCHANGE_PRE.cols].to_numpy(dtype=float)
     close = df[EXCHANGE_CLOSE.cols].to_numpy(dtype=float)
-    ok = (np.isfinite(pre) & np.isfinite(close)
-          & (pre > 1.0) & (close > 1.0)
-          & (pre >= RULE.min_odds) & (pre <= RULE.max_odds))
-    n = int(ok.sum())
-    if n < 30:
-        return float("nan"), n
-    ratio = pre[ok] / close[ok]
-    return float((ratio > 1.0).mean()), n
+    usable = np.isfinite(pre) & np.isfinite(close) & (pre > 1.0) & (close > 1.0)
+
+    out = {"n_cells": 0, "rate": float("nan"), "n_rows": 0,
+           "overround_pre": float("nan"), "overround_close": float("nan"),
+           "pct_tightened": float("nan")}
+
+    rows = usable.all(axis=1)
+    if rows.any():
+        op = (1.0 / pre[rows]).sum(axis=1)
+        oc = (1.0 / close[rows]).sum(axis=1)
+        out.update(n_rows=int(rows.sum()), overround_pre=float(op.mean()),
+                   overround_close=float(oc.mean()),
+                   pct_tightened=float((oc < op).mean()))
+
+    ok = usable & (pre >= RULE.min_odds) & (pre <= RULE.max_odds)
+    out["n_cells"] = int(ok.sum())
+    if out["n_cells"] >= 30:
+        out["rate"] = float((pre[ok] / close[ok] > 1.0).mean())
+    return out
+
+
+def two_proportion_p(k1: int, n1: int, k0: int, n0: int) -> float:
+    """p for "these two rates differ", treating the null as the estimate it is.
+
+    `binom_p` from clv_report tests against the null as though it were exact.
+    It is not -- it is measured from a few hundred cells and carries a couple
+    of points of error of its own, so the binomial reads slightly too
+    confident. Reported beside it rather than instead of it, because binom_p
+    is comparable across runs and this is the honest version of the same
+    question.
+    """
+    if min(n1, n0) < 1:
+        return float("nan")
+    p1, p0 = k1 / n1, k0 / n0
+    pool = (k1 + k0) / (n1 + n0)
+    denom = np.sqrt(pool * (1.0 - pool) * (1.0 / n1 + 1.0 / n0))
+    if denom == 0:
+        return float("nan")
+    z = (p1 - p0) / denom
+    return float(2.0 * (1.0 - stats.norm.cdf(abs(z))))
 
 
 def assert_full_history() -> None:
@@ -359,33 +404,36 @@ def build_report(verbose: bool = True) -> str:
     w("tightens toward kickoff, so prices lengthen by default and a selection picked at")
     w("random inside the rule's odds band shortens less than half the time. `null_rate`")
     w("is that rate, measured on these same settled rows over every cell the rule could")
-    w("legally have bet, and `binom_p` tests against it. Testing against 0.5 instead is")
-    w("what put a withdrawn reading into `docs/PHASE6_RESULT.md`.")
+    w("legally have bet. Testing against 0.5 instead is what put a withdrawn reading")
+    w("into `docs/PHASE6_RESULT.md`.")
     w("")
-    w("The null is measured here rather than imported: the exchange pre-close arrives")
-    w("only through `fixtures.csv` going forward, so this ladder has no history to")
-    w("measure against, and Pinnacle's drift is a poor proxy at four times the margin.")
-    w("It is unmatched on odds, which cost 0.002-0.004 where both were computed.")
+    w("The null is measured here rather than imported. Pinnacle's pre-close was a")
+    w("mature price; this one is a Tuesday/Friday snapshot taken a day out, and the")
+    w("overround line below is what makes the difference legible rather than surprising.")
     w("")
     clv_rows = []
-    null_note = None
+    null = None
     need = EXCHANGE_PRE.cols + EXCHANGE_CLOSE.cols
     if all(c in settled.columns for c in need):
         m = settled[need].notna().all(axis=1).to_numpy()
         if m.sum() >= 10:
             sub = settled[m].reset_index(drop=True)
-            null_rate, n_cells = measured_shortening_null(sub)
-            null_note = (n_cells, null_rate)
+            null = measured_shortening_null(sub)
             bets = simulate(sub, p[m], EXCHANGE_PRE, RULE)
-            if len(bets) and np.isfinite(null_rate):
+            if len(bets) and np.isfinite(null["rate"]):
                 r = clv_report(bets, closing_price_for_bets(bets, sub, CLOSE_FOR_EXCHANGE),
-                               null_rate=null_rate, null_ratio=1.0)
-                clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": len(bets),
-                                 "mean_ratio": r["mean_ratio"],
-                                 "pct_shortened": r["pct_shortened"],
-                                 "null_rate": r["null_rate"],
-                                 "excess_pp": 100 * (r["pct_shortened"] - r["null_rate"]),
-                                 "binom_p": r["binom_pvalue"]})
+                               null_rate=null["rate"], null_ratio=1.0)
+                clv_rows.append({
+                    "taken_at": EXCHANGE_PRE.label, "n_bets": r["n"],
+                    "mean_ratio": r["mean_ratio"],
+                    "pct_shortened": r["pct_shortened"],
+                    "null_rate": r["null_rate"],
+                    "excess_pp": 100 * (r["pct_shortened"] - r["null_rate"]),
+                    "binom_p": r["binom_pvalue"],
+                    "two_prop_p": two_proportion_p(
+                        round(r["pct_shortened"] * r["n"]), r["n"],
+                        round(null["rate"] * null["n_cells"]), null["n_cells"]),
+                })
             else:
                 clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": len(bets)})
     w("```")
@@ -393,18 +441,30 @@ def build_report(verbose: bool = True) -> str:
       else "  no usable pre-close/close pairs yet")
     w("```")
     w("")
-    if null_note is not None:
-        n_cells, null_rate = null_note
-        if np.isfinite(null_rate):
-            w(f"The null is itself an estimate, from **{n_cells}** eligible cells. At that")
-            w("count it carries a couple of points of sampling error of its own, which")
-            w("`binom_p` treats as exact and therefore reports as slightly too confident.")
+    if null is not None:
+        if np.isfinite(null["overround_pre"]):
+            w("**The mechanism, on these rows.** The pre-close book sums to")
+            w(f"{null['overround_pre']:.4f} and the close to {null['overround_close']:.4f}, "
+              f"tightening in {100 * null['pct_tightened']:.0f}% of {null['n_rows']} rows.")
+            w("That is where the default lengthening comes from, and it is measured rather")
+            w("than assumed.")
+            w("")
+        if np.isfinite(null["rate"]):
+            w("**Treat this as an early number, not a finding.** The null is itself an")
+            w(f"estimate, from **{null['n_cells']}** eligible cells, and `binom_p` treats it "
+              f"as exact.")
+            w("`two_prop_p` does not, and is the one to read. The graded bets are a subset")
+            w("of those cells, which dilutes the null toward the model and makes the")
+            w("comparison conservative. Every p here also assumes bets are independent,")
+            w("while same-day bets share news and market-wide moves. Nothing here clears")
+            w("the p < 0.01 this project requires before claiming an edge.")
+            w("")
         else:
-            w(f"Only **{n_cells}** eligible cells so far, below the 30 needed to measure a")
-            w("null worth testing against. No p-value is reported rather than one against")
-            w("a null this project has measured to be wrong.")
-        w("")
-
+            w(f"Only **{null['n_cells']}** eligible cells so far, below the 30 needed to "
+              f"measure a null")
+            w("worth testing against. No p-value is reported rather than one against a null")
+            w("this project has measured to be wrong.")
+            w("")
     w("## ROI, led by the sharpest price")
     w("")
     roi_rows = []

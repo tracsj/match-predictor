@@ -166,18 +166,18 @@ def test_the_measured_null_counts_only_cells_the_rule_could_have_bet():
     """
     rows = [((2.0, 2.0, 2.0), (1.8, 1.8, 1.8))] * 4         # 12 shortened cells
     rows += [((2.0, 2.0, 2.0), (2.2, 2.2, 2.2))] * 6        # 18 lengthened cells
-    rate, n_cells = grade.measured_shortening_null(_drift_frame(rows))
-    assert n_cells == 30
-    assert rate == pytest.approx(0.40)
+    out = grade.measured_shortening_null(_drift_frame(rows))
+    assert out["n_cells"] == 30
+    assert out["rate"] == pytest.approx(0.40)
 
     poisoned = rows + [
         ((1.2, 1.2, 1.2), (1.1, 1.1, 1.1)),                 # below min_odds
         ((8.0, 8.0, 8.0), (7.0, 7.0, 7.0)),                 # above max_odds
         ((2.0, 2.0, 2.0), (1.0, 1.0, 1.0)),                 # a price that is not a price
     ]
-    rate2, n_cells2 = grade.measured_shortening_null(_drift_frame(poisoned))
-    assert n_cells2 == 30, "poison rows must be excluded, not counted"
-    assert rate2 == pytest.approx(0.40)
+    out2 = grade.measured_shortening_null(_drift_frame(poisoned))
+    assert out2["n_cells"] == 30, "poison rows must be excluded, not counted"
+    assert out2["rate"] == pytest.approx(0.40)
 
 
 def test_the_measured_null_reports_no_rate_when_there_is_too_little_to_measure():
@@ -186,6 +186,46 @@ def test_the_measured_null_reports_no_rate_when_there_is_too_little_to_measure()
     from almost nothing is worse than an admitted absence: it looks like a
     measurement."""
     rows = [((2.0, 2.0, 2.0), (1.8, 1.8, 1.8))] * 3         # 9 cells, under 30
-    rate, n_cells = grade.measured_shortening_null(_drift_frame(rows))
-    assert n_cells == 9
-    assert pd.isna(rate)
+    out = grade.measured_shortening_null(_drift_frame(rows))
+    assert out["n_cells"] == 9
+    assert pd.isna(out["rate"])
+
+
+def test_the_overround_is_reported_the_way_round_it_was_measured():
+    """The mechanism line in the ledger, with an answer worked out by hand.
+
+    A book of 2.0/4.0/4.0 sums to 0.5 + 0.25 + 0.25 = 1.00; tightening it to
+    2.0/4.0/5.0 gives 0.5 + 0.25 + 0.2 = 0.95. So a frame of those two, in
+    that order, must report a pre of 1.00 and a close of 0.95 and call the
+    book tighter at the close. Reversing the pair must reverse every one of
+    those, which is the check that catches the legs being swapped — a
+    direction error reads as perfectly plausible in a table.
+    """
+    tightening = [((2.0, 4.0, 4.0), (2.0, 4.0, 5.0))] * 12
+    out = grade.measured_shortening_null(_drift_frame(tightening))
+    assert out["n_rows"] == 12
+    assert out["overround_pre"] == pytest.approx(1.00)
+    assert out["overround_close"] == pytest.approx(0.95)
+    assert out["pct_tightened"] == pytest.approx(1.0)
+
+    widening = [((2.0, 4.0, 5.0), (2.0, 4.0, 4.0))] * 12
+    back = grade.measured_shortening_null(_drift_frame(widening))
+    assert back["overround_pre"] == pytest.approx(0.95)
+    assert back["overround_close"] == pytest.approx(1.00)
+    assert back["pct_tightened"] == pytest.approx(0.0)
+
+
+def test_the_two_proportion_p_is_not_the_binomial_wearing_a_new_name():
+    """It has to account for the null's own error, or it adds nothing.
+
+    Same rates, same model sample, two null sizes: 40/100 against 30/415 and
+    40/100 against 30/415000. Treating a huge null as near-exact must give a
+    SMALLER p than a null measured from a few hundred cells, because the only
+    thing that changed is how well the null is known. Equal rates must give
+    p = 1 whatever the counts.
+    """
+    small_null = grade.two_proportion_p(40, 100, 132, 415)
+    huge_null = grade.two_proportion_p(40, 100, 132_000, 415_000)
+    assert huge_null < small_null, "a better-known null should sharpen the test"
+    assert grade.two_proportion_p(40, 100, 400, 1000) == pytest.approx(1.0)
+    assert pd.isna(grade.two_proportion_p(0, 0, 132, 415))
