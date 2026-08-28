@@ -101,8 +101,8 @@ mature price; this one is a Tuesday/Friday snapshot taken a day out, and the
 overround line below is what makes the difference legible rather than surprising.
 
 ```
-    taken_at  n_bets  mean_ratio  pct_shortened  null_rate  excess_pp  binom_p  two_prop_p
-exchange_pre      84      0.9915         0.4405     0.3181    12.2404   0.0189      0.0306
+    taken_at  n_bets  n_days  mean_ratio  pct_shortened  null_rate  excess_pp  two_prop_p  day_clustered_p
+exchange_pre      84       5      0.9915         0.4405     0.3181    12.2404      0.0306              NaN
 ```
 
 **The mechanism, on these rows.** The pre-close book sums to
@@ -111,12 +111,23 @@ That is where the default lengthening comes from, and it is measured rather
 than assumed.
 
 **Treat this as an early number, not a finding.** The null is itself an
-estimate, from **415** eligible cells, and `binom_p` treats it as exact.
-`two_prop_p` does not, and is the one to read. The graded bets are a subset
-of those cells, which dilutes the null toward the model and makes the
-comparison conservative. Every p here also assumes bets are independent,
-while same-day bets share news and market-wide moves. Nothing here clears
-the p < 0.01 this project requires before claiming an edge.
+estimate, from **415** eligible cells, and a binomial against
+it would treat it as exact. `two_prop_p` does not, and accounts for that.
+
+**`day_clustered_p` is the one to read, and it needs matchdays to read.**
+Bets sharing a matchday share news and market-wide moves, so they are not
+independent draws — block-bootstrapping days is what `bootstrap_ci` has
+always done for ROI and what the shortening test did not do until
+2026-08-27. On the two settled results that correction decided both:
+Phase 6 fell from p 0.018 to 0.154, and H1's out-of-sample lower stratum
+from 0.011 to 0.118. It is blank above until the forward record spans 20
+matchdays, because a bootstrap over a handful of days estimates the error
+downward and returns a p smaller than the uncorrected one — the correction
+appearing to strengthen the result is the correction failing.
+
+The graded bets are also a subset of the null's cells, which dilutes the
+null toward the model and makes the comparison conservative. Nothing here
+clears the p < 0.01 this project requires before claiming an edge.
 
 ## ROI, led by the sharpest price
 
