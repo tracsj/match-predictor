@@ -6,6 +6,14 @@
 
 ## Where we are — read this first
 
+**Last session: 2026-08-27 (second session that day).** Three things were fixed that nobody had listed as broken, and programme item 2 was closed. **Count holds at 49; 348 tests green.**
+
+**The next concrete action: the n-outcome harness generalisation** — roughly 23 lines across `src/eval/metrics.py`, `src/models/net.py`, `src/models/baselines.py` and `src/eval/betting.py`, moving sport-specific code under `src/sports/football/`. `devig.py` and `split.py` already generalise. It is item 4 below and it is now the *only* thing standing in front of both remaining hypotheses, which makes the H2-vs-H4 ordering question moot until it is done. Do it as its own change with its own tests: a two-outcome bug looks exactly like a two-outcome edge.
+
+**Carry one small item into that change.** `two_proportion_p` currently lives in `src/grade.py`, which has grown from a grading module into one that also holds statistics. It is a general statistic with one caller; `src/eval/` is where it belongs. The generalisation touches `betting.py` anyway, so that is the cheap moment to move it. `grade.py` is 537 lines and `betting.py` 545 — both grew this session, and `betting.py` is still cohesive while `grade.py` is the one drifting.
+
+**⚠️ The forward workflow's cron has never fired on this repository.** Three manual dispatches succeeded on 2026-08-27 and the workflow is registered and `active` with both cron lines on `master`, but every run so far is a `workflow_dispatch`. **The first scheduled fire is Friday 2026-08-28 at 17:15 UTC.** Confirm it landed: `gh run list --workflow=forecast.yml --limit 3` should show a row with event `schedule`. If it did not, the cause is not the file — check that the repository has not been marked inactive and that `master` is still the default branch.
+
 **Session 2026-08-27.** The forward workflow was rescued from a publishing accident, and the CLV null correction finally reached the code. **Count unchanged at 49** — nothing here fitted a model or searched for edge.
 
 **The correction that had never been enacted.** The 2026-08-17 session established that testing CLV against a 50% shortening rate is wrong and wrote it into `CLAUDE.md`, `docs/` and three pre-registrations. `clv_report` went on hardcoding `binomtest(..., 0.5)` and `ttest_1samp(ratio, 1.0)` for ten days, so **every forward ledger this project has written tested the model against a coin flip.** Both nulls are now required keyword arguments with no default; every settled caller passes `0.5`/`1.0` explicitly and reproduces its recorded numbers unchanged (`h1_holdout_tiers.py` still prints lower 309 bets, 0.3819, +0.0674, z 2.55, p 0.0108). The ledger also stopped reprinting the withdrawn "wrong side of the market's own movement" gloss, which `src/grade.py` had been emitting on every run.
@@ -103,7 +111,23 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 
 **Configurations evaluated to date: 49.**
 
-**Reconciled 2026-08-27: the count holds at 49.** Two things ran and neither is a configuration. `scripts/forward_matched_null.py` samples prices and fits nothing — a control in the same sense as `h1_odds_matched_null.py`, already ruled on below. `src/grade.py`'s measured null recomputes a statistic over the forward ledger's existing, unchanged bet population; it is a new cut of a running record, not a new evaluation, and the bets it grades were committed by a workflow rather than selected by a search. Nothing tonight looked for edge.
+**Reconciled 2026-08-27 (second session that day): the count holds at 49.** Nine things ran and none is a configuration. Named individually rather than summarised, because "nothing else was evaluated" is indistinguishable from having skipped the step:
+
+| what ran | why it does not count |
+|---|---|
+| `scripts/forward_matched_null.py` | samples prices and fits nothing — the same class as `h1_odds_matched_null.py`, already ruled on below |
+| `src/grade.py` — `measured_shortening_null` | measures the market's own drift over the forward rows. No model fitted |
+| `src/grade.py` — `two_proportion_p` | a second statistic on the ledger's existing, unchanged bet population. A new cut, not a new evaluation |
+| `scripts/day_clustered_clv.py` — Phase 6 arm | recomputes a statistic on Phase 6's **fixed, already-counted** bet population, gated on reproducing its published z first. The same ruling `phase6_null_reanalysis.py` already carries |
+| `scripts/day_clustered_clv.py` — H1 out-of-sample arm | same, on a slice already counted as part of the H1 run |
+| `scripts/day_clustered_clv.py` — H1 in-sample arm | **an explicit control.** It exists to *fail* to matter: if clustering could overturn z = 14.2 the correction would be too strong to believe |
+| `scripts/h1_holdout_tiers.py`, re-run | a reproducibility check after `clv_report`'s signature changed. It printed its recorded numbers unchanged, which is the entire point |
+| three grafted forward runs + three manual dispatches | the **settled** configuration applied forward by a workflow. The fixtures were chosen by a calendar, not by a search |
+| three regenerations of `docs/FORWARD_LEDGER.md` | a machine-written record of the above. It selects nothing |
+
+**None of them searched for edge**, and three actively hoped to find nothing: the in-sample control, the reproducibility re-run, and the odds-matching check whose useful answer was "this changes nothing." A control whose result nobody is hoping for cannot widen a search.
+
+⚠️ **The one that came closest to counting, and the reasoning that kept it out.** `measured_shortening_null` changed the forward ledger's CLV reading from p 0.44 to a nominal p 0.031 — a sign flip, which is what an evaluation looks like. It still does not count: the bet population was fixed by a committed workflow before the null existed, the null is a property of the *market* rather than of any model, and no alternative was tried and discarded. What changed was the yardstick, not the search.
 
 **+1 on 2026-08-17 (third session): the H1 tier-stratified run.** One configuration — inherited rule, inherited model, one pre-specified contrast — scored on CLV and ROI. It **passed its pre-registered test**, which is the first time anything here has. `docs/H1_RESULT.md` carries the tables and the diagnostics, and the diagnostics matter more than the verdict.
 

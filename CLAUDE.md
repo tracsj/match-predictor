@@ -23,11 +23,11 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 | `docs/PREREGISTRATION.md` | the football betting rule, prices and holdout, fixed before any PnL existed |
 | `docs/PREREG_PHASE6_NULL.md` | the pre-registered re-analysis of Phase 6's CLV against a measured null, its reproduction gate, and the result that withdrew the "wrong side of the market" reading |
 | `docs/FORWARD_LEDGER.md` | the forward record — predictions committed before kickoff, graded as results land. Rewritten from `predictions/*.csv` on every run, never appended |
-| `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting — **plus a 2026-08-17 correction withdrawing its "wrong side of the market" reading**, with the superseded passages marked in place rather than rewritten |
+| `docs/PHASE6_RESULT.md` | the betting answer, the CLV table, and why the model loses more than random betting — **plus two corrections**: 2026-08-17 withdrew its "wrong side of the market" reading, and 2026-08-27 removed that reading's significance by clustering on matchday (p 0.018 → 0.154). Superseded passages are marked in place rather than rewritten |
 | `docs/H3_RESULT.md` | H3's result: line movement **is** forecastable (+4.27pp over a matched null) and buys nothing — the gain is −0.15% of price against a 5.08% margin, and it does not beat a match model's incidental signal |
-| `docs/H1_RESULT.md` | H1's result and its diagnostics: the tier-stratified CLV tables, the **measured CLV null** and the overround-tightening mechanism behind it, the per-tier margins over each tier's own drift, the control arms (anti-model, ordered logit, random-in-band), and the 2025-26 out-of-sample check |
+| `docs/H1_RESULT.md` | H1's result and its diagnostics: the tier-stratified CLV tables, the **measured CLV null** and the overround-tightening mechanism behind it, the per-tier margins over each tier's own drift, the control arms (anti-model, ordered logit, random-in-band), the 2025-26 out-of-sample check, and the **day-clustered re-test** that removed its significance along with the within-day correlation measurement behind it |
 | `docs/TIER2_RESULT.md` | what a starting XI is worth (nothing measurable), and the SportMonks upgrade recommendation |
-| `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it — including **Pinnacle's removal in 2026/27** and the exchange-vs-Pinnacle benchmark measurement, what `fixtures.csv` holds, and why `download_all` cannot refresh |
+| `docs/research/00-measured-facts.md` | what each data source actually contains, with the command that established it — including **Pinnacle's removal in 2026/27**, the exchange-vs-Pinnacle benchmark, **what the exchange pre-close actually is** (a Tue/Fri snapshot a day out, 1.0603 book tightening to 1.0213), what `fixtures.csv` holds, and why `download_all` cannot refresh |
 | `docs/research/01-neural-nets-for-match-prediction.md` | what wins on this task, with RPS numbers tagged to their datasets |
 | `docs/research/02-betting-evaluation-and-odds-data.md` | how to build a backtest that would tell you the truth if the model were bad |
 
@@ -90,10 +90,12 @@ src/
   forward.py   predict upcoming fixtures, write predictions/YYYY-MM-DD.csv
   grade.py     grade committed predictions, rewrite docs/FORWARD_LEDGER.md
 scripts/       assert_selftests_ran.py — the five self-tests must RUN, not skip
-               h1_*.py, clv_null_calibration.py, forward_matched_null.py —
-               H1's coverage probe, its post-hoc controls, and the forward
-               ledger's odds-matching check. Each says in its docstring whether
-               it is a control (no registry count) or an evaluation
+               h1_*.py, clv_null_calibration.py, forward_matched_null.py,
+               day_clustered_clv.py — H1's coverage probe, its post-hoc
+               controls, the forward ledger's odds-matching check, and the
+               day-clustered re-test of the two marginal CLV results. Each says
+               in its docstring whether it is a control (no registry count) or
+               an evaluation
 predictions/   committed forward predictions. NOT gitignored; the commit is the
                evidence, so never rewrite or backfill a file here.
 v1/            the original build, frozen. Its betting numbers are unreliable —
@@ -111,6 +113,7 @@ v1/            the original build, frozen. Its betting numbers are unreliable �
 
 ## Data boundaries that bite
 
+- **The exchange pre-close is a thin snapshot, not a mature price.** `bfe*` reaches the corpus only through `fixtures.csv`, at a **median 21 hours** before kickoff, with a book summing to **1.0603** against a close of **1.0213** — tightening in 88% of rows. That is why only **31.8%** of band-eligible selections shorten on this ladder against Pinnacle's 45–48%, and why Pinnacle's null must never be borrowed for it.
 - **The exchange has no historical PRE-close.** `bfeh/bfed/bfea` are **absent from the results files entirely** — they arrive only through `fixtures.csv`, going forward. `bfec*` (the close) is there from 2024/25. So the exchange can grade forward CLV and **cannot grade a backward-looking one at all**; `psh → psch` is the only historical ladder that exists, and it ends in January 2026. Measured with `scripts/h1_holdout_coverage.py`.
 - **Some "odds" are not odds.** 29 cells across 12 columns carry a price ≤ 1.0 — missing data wearing a number, which `notna()` does not catch and `np.nan_to_num` turns into a huge finite feature with no error and no NaN. Three are **1X2 closing** columns (`b365ca`, `maxca`, `avgca`). Nothing reported has moved, because a zero scores EV −1 and can never be a rule's argmax, and `min_odds` excludes it again — but **anything building features from raw prices must filter `> 1.0`**, as `build_frame()` in `src/h3.py` does. `tests/test_price_sanity.py` sweeps every odds column and fails on any new occurrence.
 - **Pinnacle is gone.** Closing odds run 2012/13 → **2026-01-14**, decaying from October 2025, and the columns are **absent from the 2026/27 schema entirely** — removed, not empty. Grade forward work against the **Betfair Exchange close** (`bfec*`, from 2024/25, ~100% covered). Do not fall back to Bet365 or market-average and call it the closing line.
