@@ -3,11 +3,15 @@ backtest lying to you.
 
 Three design decisions are load-bearing and none of them are arbitrary:
 
-**Flat stakes for the headline.** One unit per bet. It keeps ROI interpretable
-and stops a single early lucky result compounding through the whole equity
-curve. Kelly is available as a supplementary bankroll simulation, fractional,
-because full Kelly systematically over-bets whenever probabilities are
-estimated rather than known -- which is always.
+**Flat stakes, and only flat stakes.** One unit per bet. It keeps ROI
+interpretable and stops a single early lucky result compounding through the
+whole equity curve, and `docs/PREREGISTRATION.md` fixes it as part of the rule:
+"no compounding, no Kelly". There is NO Kelly implementation here -- this
+docstring claimed one for months and was wrong. If a supplementary bankroll
+simulation is ever wanted it should be fractional, because full Kelly
+systematically over-bets whenever probabilities are estimated rather than
+known, which is always; and it would not rescue a rule whose deficit is
+uniform across confidence buckets, which is what this one measured.
 
 **Three price columns, always, led by the sharpest.** Constantinou (2022)
 measured the gap: at a zero edge threshold, 1X2 ROI over 13 EPL seasons was
