@@ -51,7 +51,7 @@ Before we close this session:
    - *Additions*: anything new this session that should be documented? New data boundaries and new failure modes are the two that matter most here.
    - *Staleness*: is everything already there still accurate? Measured facts drift — a vendor changes coverage, a feed stops.
    - *Global*: did anything reveal a universal principle? Before adding to `~/.claude/CLAUDE.md`, pass this 3-question filter — all must pass: (1) behavioral guardrail that prevents a recurring mistake, not reference knowledge; (2) would cause a mistake in *typical* sessions; (3) plausibly applies in 2+ active repos. If not all three → route to skill gotchas, this CLAUDE.md, or `~/.claude/reference/troubleshooting.md`.
-   - *Context budget*: run `python3 ~/.claude/bin/context-budget.py` before adding to `~/.claude/CLAUDE.md` **or** this repo's `CLAUDE.md`. Non-zero exit means a compaction pass is owed *before* the addition — keep the action in the hub, move mechanism and narrative to a spoke.
+   - *Context budget*: run `python3 ~/.claude/bin/context-budget.py` before adding to `~/.claude/CLAUDE.md` **or** this repo's `CLAUDE.md`. **It reports and never refuses — always exit 0, Stephen's ruling 2026-08-27**, after a saturated ceiling blocked a legitimate addition to a file with only ~160 recoverable words. An `outside` reading is a prompt to rehome, never a reason to withhold an accurate rule: keep the action in the hub, move mechanism and narrative to a spoke. For *what* to rehome read the report's **LARGEST UNITS** list, and `--rate` for house style.
 
 10. **Memory health** — Periodically (every 5–10 sessions) run `/housekeeping`. Skip if last run was recent.
 
