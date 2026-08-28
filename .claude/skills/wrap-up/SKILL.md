@@ -37,7 +37,7 @@ Before we close this session:
    - One-off → leave in Staging only
    - Older than 30 days, unpromoted → delete
 
-   Staging stays lean — a handful of active observations at most.
+   **Age is the signal, never count** *(2026-08-27 — replaced "Staging stays lean, a handful of active observations at most," a retired count in prose)*. A full Staging is usually throughput: across 55 entries measured, 58% were 0–2 days old and only 2 over a fortnight, so a count fires hardest on the best days. Staging is the archive's inbox; git history is the archive.
 
 5. **Test suite** — Run `uv run pytest -q`. The harness self-tests are what make every number in this repo trustworthy: the cheater probe, the poisoned-split leak guard, the closed-form margin check, the published-band check on the market. **A failure here is not flaky — it means something real broke.** Do not close a session on a red suite without saying so explicitly.
 
@@ -49,7 +49,7 @@ Before we close this session:
 
 9. **CLAUDE.md accuracy** — Four passes:
    - *Additions*: anything new this session that should be documented? New data boundaries and new failure modes are the two that matter most here.
-   - *Staleness*: is everything already there still accurate? Measured facts drift — a vendor changes coverage, a feed stops.
+   - *Staleness*: **ask of every claim "is this still true, and is it labelled with what it is true *of*?"** — not "have any numbers moved?". A drifting number is cheap to fix; a conclusion that has quietly become wrong, or a figure carrying no scope, is what misleads the next session. Both recur here. The test count has drifted at every reconciliation (299→302→321→337→344→348). A *conclusion* went stale when the founding study's CLV gloss outlived the null it depended on. And an **unscoped** figure is the same fault wearing different clothes: the CLV rule read "45–48% of selections shorten" as though that were a property of the market, when it is a property of *one price ladder* — the exchange measures 31.8%, and reading one against the other misstates the null by 13 points. Check the code too, not only the docs: `betting.py`'s own docstring advertised a Kelly simulation that has never existed.
    - *Global*: did anything reveal a universal principle? Before adding to `~/.claude/CLAUDE.md`, pass this 3-question filter — all must pass: (1) behavioral guardrail that prevents a recurring mistake, not reference knowledge; (2) would cause a mistake in *typical* sessions; (3) plausibly applies in 2+ active repos. If not all three → route to skill gotchas, this CLAUDE.md, or `~/.claude/reference/troubleshooting.md`.
    - *Context budget*: run `python3 ~/.claude/bin/context-budget.py` before adding to `~/.claude/CLAUDE.md` **or** this repo's `CLAUDE.md`. **It reports and never refuses — always exit 0, Stephen's ruling 2026-08-27**, after a saturated ceiling blocked a legitimate addition to a file with only ~160 recoverable words. An `outside` reading is a prompt to rehome, never a reason to withhold an accurate rule: keep the action in the hub, move mechanism and narrative to a spoke. For *what* to rehome read the report's **LARGEST UNITS** list, and `--rate` for house style.
 
