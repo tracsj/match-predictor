@@ -12,6 +12,15 @@
 >
 > **The selections were on the right side of the market's movement, not the wrong one** — narrowly, at p = 0.018, which would not clear the p < 0.01 bar this project uses for claiming edge. All four pre-close ladders point the same way, though they are overlapping selections rather than independent confirmations.
 >
+> **⚠️ SECOND CORRECTION, 2026-08-27 — that p = 0.018 assumed bets were independent, and they are not.** The row above stands as recorded; this is the diagnostic under it, not a rewrite of it. Every shortening-rate z in this project used `sqrt(p(1-p)/n)` while `bootstrap_ci` has always resampled *matchdays*, because same-day bets share news and market-wide moves. Block-bootstrapping days over the same 1,337 bets:
+>
+> | | bets | days | z | p |
+> |---|---|---|---|---|
+> | as recorded, independent | 1,337 | — | 2.36 | 0.018 |
+> | **day-clustered** | 1,337 | **116** | **1.43** | **0.154** |
+>
+> The standard error inflates **1.66×**, a design effect of **2.74** — so the 1,337 bets carried closer to 490 bets' worth of independent evidence. That correction is not uniform and was checked against a control: H1's in-sample stratum, 9,920 bets over 903 days, shows a design effect of only **1.11** and its z of 14.2 barely moves. The within-day correlation is roughly 0.16 in 2025-26 against 0.01 over the ten-season panel, which is consistent with 2025-26 carrying the corpus's most extreme drift — a season where a day's prices lengthen together. **The direction is unchanged and the significance is gone.** The +3.15pp margin over the matched null is still positive and still on the right side of the market's movement; it is no longer distinguishable from noise. Gated on reproducing this page's recorded z of 2.36 before the clustered one was computed, at `scripts/day_clustered_clv.py`. The null is treated as exact, which it is not — folding in its simulation error moves p further from significance, never toward it.
+>
 > **Everything else on this page stands, and the correction must not be read as softening it**: every ROI number, the finding that the rule lost money in all four price columns, the random-bet-null comparison, and the conclusion that no staking rule rescues a model that has not first beaten the market on RPS. A CLV direction is not a yield. The corrected picture is that the model picked *prices* slightly better than recorded while picking *outcomes* worse than the market — a price edge of roughly 1–2% against a margin near 4%.
 >
 > Full result in `docs/PREREG_PHASE6_NULL.md`; the mechanism and the null's derivation in `docs/H1_RESULT.md`.

@@ -54,7 +54,7 @@ from src.data.footballdata import OUT_DIR, REPO_ROOT
 from src.eval.betting import (
     B365_CLOSE, CLOSE_FOR_EXCHANGE, EXCHANGE_CLOSE, EXCHANGE_PRE, MARKET_AVG_CLOSE,
     MARKET_MAX_CLOSE, bootstrap_ci, clv_report, closing_price_for_bets,
-    required_sample_size, simulate, summarize,
+    day_clustered_shortening_test, required_sample_size, simulate, summarize,
 )
 from src.eval.devig import devig
 from src.eval.metrics import summary
@@ -423,16 +423,20 @@ def build_report(verbose: bool = True) -> str:
             if len(bets) and np.isfinite(null["rate"]):
                 r = clv_report(bets, closing_price_for_bets(bets, sub, CLOSE_FOR_EXCHANGE),
                                null_rate=null["rate"], null_ratio=1.0)
+                clustered = day_clustered_shortening_test(
+                    bets, closing_price_for_bets(bets, sub, CLOSE_FOR_EXCHANGE),
+                    null_rate=null["rate"])
                 clv_rows.append({
                     "taken_at": EXCHANGE_PRE.label, "n_bets": r["n"],
+                    "n_days": clustered["n_blocks"],
                     "mean_ratio": r["mean_ratio"],
                     "pct_shortened": r["pct_shortened"],
                     "null_rate": r["null_rate"],
                     "excess_pp": 100 * (r["pct_shortened"] - r["null_rate"]),
-                    "binom_p": r["binom_pvalue"],
                     "two_prop_p": two_proportion_p(
                         round(r["pct_shortened"] * r["n"]), r["n"],
                         round(null["rate"] * null["n_cells"]), null["n_cells"]),
+                    "day_clustered_p": clustered["pvalue"],
                 })
             else:
                 clv_rows.append({"taken_at": EXCHANGE_PRE.label, "n_bets": len(bets)})
@@ -451,13 +455,23 @@ def build_report(verbose: bool = True) -> str:
             w("")
         if np.isfinite(null["rate"]):
             w("**Treat this as an early number, not a finding.** The null is itself an")
-            w(f"estimate, from **{null['n_cells']}** eligible cells, and `binom_p` treats it "
-              f"as exact.")
-            w("`two_prop_p` does not, and is the one to read. The graded bets are a subset")
-            w("of those cells, which dilutes the null toward the model and makes the")
-            w("comparison conservative. Every p here also assumes bets are independent,")
-            w("while same-day bets share news and market-wide moves. Nothing here clears")
-            w("the p < 0.01 this project requires before claiming an edge.")
+            w(f"estimate, from **{null['n_cells']}** eligible cells, and a binomial against")
+            w("it would treat it as exact. `two_prop_p` does not, and accounts for that.")
+            w("")
+            w("**`day_clustered_p` is the one to read, and it needs matchdays to read.**")
+            w("Bets sharing a matchday share news and market-wide moves, so they are not")
+            w("independent draws — block-bootstrapping days is what `bootstrap_ci` has")
+            w("always done for ROI and what the shortening test did not do until")
+            w("2026-08-27. On the two settled results that correction decided both:")
+            w("Phase 6 fell from p 0.018 to 0.154, and H1's out-of-sample lower stratum")
+            w("from 0.011 to 0.118. It is blank above until the forward record spans 20")
+            w("matchdays, because a bootstrap over a handful of days estimates the error")
+            w("downward and returns a p smaller than the uncorrected one — the correction")
+            w("appearing to strengthen the result is the correction failing.")
+            w("")
+            w("The graded bets are also a subset of the null's cells, which dilutes the")
+            w("null toward the model and makes the comparison conservative. Nothing here")
+            w("clears the p < 0.01 this project requires before claiming an edge.")
             w("")
         else:
             w(f"Only **{null['n_cells']}** eligible cells so far, below the 30 needed to "

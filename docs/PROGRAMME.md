@@ -30,7 +30,7 @@
 
 **Still true and unchanged:** the forward workflow is live and verified on a real runner (`tracsj/match-predictor`, default branch `master`); Pinnacle is gone from the 2026/27 schema; the exchange close replaces it going forward. Runner-only bugs and cold-cache timings are further down.
 
-**A methods caveat that applies to every z-statistic quoted above.** All the shortening-rate tests use `sqrt(p(1-p)/n)`, which assumes bets are independent. They are not: this repo's own `bootstrap_ci` resamples **matchdays** precisely because same-day bets share news and market-wide moves. Clustering cannot overturn z = 7–14 (H1 in-sample, H3), but it plausibly matters for the two marginal results — Phase 6 at p = 0.018 and H1's out-of-sample at p = 0.011 — which are already the two labelled "narrow" and "inconclusive by floor". **A day-clustered shortening test is queued as a methods item**, not run tonight.
+**A methods caveat that applies to every z-statistic quoted above.** All the shortening-rate tests use `sqrt(p(1-p)/n)`, which assumes bets are independent. They are not: this repo's own `bootstrap_ci` resamples **matchdays** precisely because same-day bets share news and market-wide moves. Clustering cannot overturn z = 7–14 (H1 in-sample, H3), but it plausibly matters for the two marginal results — Phase 6 at p = 0.018 and H1's out-of-sample at p = 0.011 — which are already the two labelled "narrow" and "inconclusive by floor". ~~**A day-clustered shortening test is queued as a methods item**, not run tonight.~~ **Run 2026-08-27, and neither marginal result survived it** — Phase 6 fell to p 0.154, H1's out-of-sample lower stratum to p 0.118. The prediction in this paragraph held on both counts: clustering did not reach the large z, and it did decide the two marginal ones. Item 2 below carries the tables.
 
 **Two data boundaries found this session.** The exchange **pre-close** (`bfeh/bfed/bfea`) is absent from the results files entirely, arriving only through `fixtures.csv` — so there is no backward-looking exchange ladder, and `psh → psch` is the only historical one.
 
@@ -44,7 +44,19 @@ And **29 cells across 12 odds columns carry a price ≤ 1.0** — missing data w
 
    **What the first 169 settled predictions say.** The net scores RPS **0.2110** against the exchange close at **0.2121** — nominally ahead, on 169 matches, which is far too few to mean anything. ROI reads positive in all four price columns on 66–102 bets, and only `b365_close` has an interval clear of zero (+0.36, [0.023, 0.639]) — one column of four at that sample size is what noise looks like. CLV is the number that moved when the null was corrected, and it is covered below.
 
-2. **Day-cluster the shortening-rate test.** Every CLV z reported on 2026-08-17 assumes independent bets while `bootstrap_ci` already resamples matchdays. Re-derive Phase 6's p = 0.018 and H1's out-of-sample p = 0.011 with day clustering — the two marginal results — and state whether they survive. Cheap, and it touches `src/eval/betting.py` plus the two result files.
+2. ~~**Day-cluster the shortening-rate test.**~~ **Done 2026-08-27, and it decided both marginal results.** `src/eval/betting.py` gained `day_clustered_shortening_test`; `scripts/day_clustered_clv.py` runs it, gated on reproducing each recorded independent z before computing a clustered one. Both gates passed on all four checks.
+
+   | result | bets | days | z indep | p indep | **z clustered** | **p clustered** | design effect |
+   |---|---|---|---|---|---|---|---|
+   | Phase 6, 2025-26 | 1,337 | 116 | 2.36 | 0.018 | **1.43** | **0.154** | 2.74 |
+   | H1 out of sample, lower | 309 | 28 | 2.55 | 0.011 | **1.56** | **0.118** | 2.66 |
+   | H1 in sample, lower *(control)* | 9,920 | 903 | 14.18 | ~0 | 13.43 | ~0 | 1.11 |
+
+   **Neither marginal result survives; the direction of both is unchanged.** The recorded tables in `docs/PHASE6_RESULT.md` and `docs/H1_RESULT.md` stay as recorded, with the clustered result marked below them as a diagnostic.
+
+   **The control is what makes the correction believable, and it found something.** All three arms carry about eleven bets per matchday, so cluster size is not the difference. Within-day correlation runs about **0.16** in the 2025-26 arms against **0.01** across the ten-season panel — an order of magnitude, in the one season both marginal results live in. A season whose overround tightens hardest is one where a day's prices lengthen together, so this is consistent with what `docs/H1_RESULT.md` already says about 2025-26's drift being the corpus's most extreme.
+
+   **The forward ledger inherits the same test and cannot use it yet.** 84 bets over 5 matchdays. A cluster bootstrap over a handful of blocks estimates the error downward and returns a p *smaller* than the uncorrected one — which is the correction failing while looking like it worked, and is what the first version of this printed. There is now a 20-block floor, and the ledger prints blank until the forward record reaches it.
 
 3. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
 

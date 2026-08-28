@@ -161,7 +161,18 @@ Season 2025-26 is the only data outside the contamination pathway. `scripts/h1_h
 
 **Both strata are INCONCLUSIVE BY FLOOR** — 309 and 823 bets against the pre-registered 3,250 — and the floor is not lowered to let them speak.
 
-**The z here assumes independent bets and they are not** — `bootstrap_ci` resamples matchdays for exactly that reason. At p = 0.011 on 309 bets this has no margin to spare, which is a second reason beyond the floor to treat it as directional only. Queued as a methods item.
+**⚠️ The z above assumes independent bets, and the clustered test has now been run — 2026-08-27.** `bootstrap_ci` has always resampled matchdays because same-day bets share news and market-wide moves; the shortening test never did. The table stays as recorded. Block-bootstrapping days over the same 309 bets:
+
+| | bets | days | z | p |
+|---|---|---|---|---|
+| as recorded, independent | 309 | — | 2.55 | 0.011 |
+| **day-clustered** | 309 | **28** | **1.56** | **0.118** |
+
+The standard error inflates **1.63×**, a design effect of **2.66**, so 309 bets carried about 116 bets' worth of independent evidence. **The lower stratum is not significant.** Its +6.74pp margin over the season's own drift is unchanged and still points the same way as in sample; it simply cannot be distinguished from noise, which was already the reading the 3,250-bet floor forced. Run at `scripts/day_clustered_clv.py`, gated on reproducing the 2.55 above first.
+
+**The in-sample z of 14.2 is untouched — measured, not assumed.** Run as a third arm and gated the same way, it moves 14.18 → **13.43**, a design effect of **1.11**. Clustering decides marginal results and cannot reach that one.
+
+**And the reason it barely moves is the more interesting finding.** All three arms carry about eleven bets per matchday, so cluster *size* is not what separates them. The intra-cluster correlation is: roughly **0.16** in the 2025-26 arms against **0.01** across the ten-season panel. Same market, same rule, an order of magnitude apart. That fits what this page already says about 2025-26 having by far the most extreme drift in the corpus — a season whose overround tightens hard is one where a day's prices lengthen *together*, which is exactly what within-day correlation measures. **The clustering correction bites hardest in the one season both marginal results live in**, which is unlucky rather than suspicious, and it is the reason a caveat that looked procedural turned out to decide two readings.
 
 Read against 50%, that 38.19% looks like the finding collapsing. Read against the season's own drift of 31.45% — 2025-26 has by far the most extreme drift in the corpus — it is **directionally consistent with in-sample and close to it in size**. It is *not* a replication: the lower stratum is marginally significant on 309 bets, the upper is not significant at all, and both nulls come from a single anomalous season. Directionally consistent is the strongest phrase the evidence supports.
 

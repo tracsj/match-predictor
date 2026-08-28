@@ -39,6 +39,7 @@ from src.eval.metrics import OUTCOMES
 
 __all__ = [
     "PriceSet", "BetRule", "simulate", "summarize", "clv_report",
+    "day_clustered_shortening_test",
     "bootstrap_ci", "random_bet_null", "required_sample_size",
     "PINNACLE_CLOSE", "B365_CLOSE", "MARKET_MAX_CLOSE", "DEFAULT_PRICES",
     "PINNACLE_PRE", "B365_PRE", "MARKET_MAX_PRE", "MARKET_AVG_PRE",
@@ -359,6 +360,97 @@ def required_sample_size(mean_odds: float, edge: float = 0.02,
     sigma = mean_odds * np.sqrt(p * (1 - p))
     z = stats.norm.ppf(1 - alpha / 2) + stats.norm.ppf(power)
     return int(np.ceil((z * sigma / edge) ** 2))
+
+
+def day_clustered_shortening_test(bets: pd.DataFrame, closing_odds: pd.Series, *,
+                                  null_rate: float | None = None,
+                                  n_boot: int = 10_000, seed: int = 0,
+                                  min_blocks: int = 20) -> dict:
+    """Is the shortening rate above its null once same-day bets stop counting
+    as independent evidence?
+
+    `clv_report`'s binomial assumes every bet is its own draw. They are not:
+    bets placed on the same matchday share news, weather, a market-wide move
+    and often the same model quirk, which is exactly why `bootstrap_ci` already
+    resamples matchdays rather than bets. Ignoring that inflates z by the
+    square root of the design effect, and the two marginal CLV results in this
+    project sat close enough to the bar for that to decide them.
+
+    Resamples whole days with replacement, recomputes the shortening rate, and
+    takes the bootstrap standard deviation as the standard error. The number of
+    bets varies between resamples, which is correct for a cluster bootstrap and
+    is the mechanism by which day-level structure reaches the interval.
+
+    `null_rate` is required, for the reason `clv_report` gives. It is treated
+    here as EXACT, which it is not -- a measured null carries its own error, and
+    folding it in would push p further from significance rather than toward it.
+    That direction is why the headline does not need it: it cannot rescue a
+    result, only weaken one.
+
+    BELOW `min_blocks` DAYS NO z OR p IS RETURNED, and that floor is the point
+    of this argument rather than defensive padding. A cluster bootstrap
+    estimates the standard error from the spread across blocks, so with a
+    handful of blocks it estimates it badly and biased DOWNWARD -- the test then
+    reports a p SMALLER than the uncorrected one, which looks like the
+    correction strengthening the result when it is the correction failing. That
+    is exactly what the forward ledger produced on 84 bets over 5 days, and it
+    is why the floor exists rather than a caveat. Cameron & Miller's survey puts
+    usable cluster-robust inference at roughly 30-50 groups; 20 is the point
+    below which the number is not worth printing at all.
+
+    The reference distribution is normal, matching every other z this project
+    reports. A t with G-1 degrees of freedom would be marginally more
+    conservative and was checked: it moves Phase 6 from 0.1538 to 0.1565 and
+    H1's out-of-sample stratum from 0.1179 to 0.1296. Neither conclusion moves,
+    so the comparable choice is kept.
+    """
+    if null_rate is None:
+        raise TypeError(
+            "day_clustered_shortening_test requires null_rate. Measure the "
+            "drift of the ladder you are grading -- see "
+            "scripts/clv_null_calibration.py."
+        )
+
+    empty = {"shortened_rate": float("nan"), "se_boot": float("nan"),
+             "z": float("nan"), "pvalue": float("nan"),
+             "null_rate": float(null_rate), "n_bets": 0, "n_blocks": 0}
+    if bets.empty:
+        return empty
+
+    taken = bets["odds"].to_numpy(dtype=float)
+    close = np.asarray(closing_odds, dtype=float)
+    ok = np.isfinite(taken) & np.isfinite(close) & (close > 0)
+    if not ok.any():
+        return empty
+
+    shortened = (taken[ok] / close[ok] > 1.0)
+    blocks = _blocks(bets)[ok]
+    uniq = np.unique(blocks)
+    by_block = {b: shortened[blocks == b] for b in uniq}
+
+    theta = float(shortened.mean())
+
+    rng = np.random.default_rng(seed)
+    reps = np.empty(n_boot)
+    for i in range(n_boot):
+        draw = np.concatenate([by_block[b]
+                               for b in rng.choice(uniq, size=len(uniq), replace=True)])
+        reps[i] = draw.mean()
+    se = float(reps.std(ddof=1))
+
+    enough = len(uniq) >= min_blocks
+    z = (theta - null_rate) / se if (se > 0 and enough) else float("nan")
+    return {
+        "shortened_rate": theta,
+        "se_boot": se,
+        "se_independent": float(np.sqrt(null_rate * (1 - null_rate) / int(ok.sum()))),
+        "z": float(z),
+        "pvalue": float(2.0 * (1.0 - stats.norm.cdf(abs(z)))) if np.isfinite(z) else float("nan"),
+        "null_rate": float(null_rate),
+        "n_bets": int(ok.sum()),
+        "n_blocks": int(len(uniq)),
+        "min_blocks": int(min_blocks),
+    }
 
 
 def clv_report(bets: pd.DataFrame, closing_odds: pd.Series, *,

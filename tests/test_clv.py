@@ -20,7 +20,8 @@ import pytest
 from src.data.footballdata import OUT_DIR
 from src.eval.betting import (
     B365_PRE, CLOSE_FOR, MARKET_MAX_PRE, PINNACLE_CLOSE, PINNACLE_PRE, BetRule,
-    clv_report, closing_price_for_bets, simulate,
+    clv_report, closing_price_for_bets, day_clustered_shortening_test,
+    simulate,
 )
 from src.eval.devig import devig
 
@@ -293,3 +294,97 @@ def test_the_t_test_uses_the_ratio_null_it_was_given():
     assert against_one["t_stat"] > 0
     assert against_the_mean["t_stat"] == pytest.approx(0.0, abs=1e-9)
     assert against_the_mean["t_pvalue"] == pytest.approx(1.0)
+
+
+# --------------------------------------------------------------------------
+# Day clustering: same-day bets are not independent evidence
+# --------------------------------------------------------------------------
+
+def _dated_bets(days, per_day):
+    """`per_day` bets on each of `days` distinct dates, odds fixed at 2.2."""
+    dates, ids = [], []
+    for d in range(days):
+        for j in range(per_day):
+            dates.append(pd.Timestamp("2024-01-01") + pd.Timedelta(days=d))
+            ids.append(f"d{d}b{j}")
+    return pd.DataFrame({"match_id": ids, "selection": ["H"] * len(ids),
+                         "odds": [2.2] * len(ids), "date": dates})
+
+
+def test_clustering_inflates_the_error_when_a_whole_day_moves_together():
+    """The entire point, in a case with a hand-computable answer.
+
+    Twenty days of five bets each. In the clustered frame every bet on a day
+    shares that day's outcome, so the hundred bets carry exactly twenty
+    independent pieces of evidence and the standard error must be about
+    sqrt(5) = 2.24 times the independent one. In the scattered frame the same
+    hundred outcomes are dealt one per day across a hundred days, so there is
+    no within-day structure left and the two errors must agree.
+
+    Both frames hold the SAME 60 shortened and 40 lengthened bets. Only the
+    arrangement differs, which is what isolates clustering from rate.
+    """
+    # 12 of 20 days entirely shortened, 8 entirely lengthened -> 60/100.
+    clustered = _dated_bets(days=20, per_day=5)
+    close_clustered = pd.Series([2.0] * 60 + [2.5] * 40)
+
+    # The same 60/40, one bet per day over 100 days: no clustering at all.
+    scattered = _dated_bets(days=100, per_day=1)
+    close_scattered = pd.Series([2.0] * 60 + [2.5] * 40)
+
+    c = day_clustered_shortening_test(clustered, close_clustered,
+                                      null_rate=0.5, n_boot=2000, seed=0)
+    s = day_clustered_shortening_test(scattered, close_scattered,
+                                      null_rate=0.5, n_boot=2000, seed=0)
+
+    assert c["n_bets"] == s["n_bets"] == 100
+    assert c["n_blocks"] == 20 and s["n_blocks"] == 100
+    assert c["shortened_rate"] == pytest.approx(0.60)
+    assert s["shortened_rate"] == pytest.approx(0.60)
+
+    # sqrt(5) = 2.236, worked out from the design rather than read back.
+    assert c["se_boot"] / s["se_boot"] == pytest.approx(2.236, rel=0.20)
+    # With no within-day structure the bootstrap must land on the binomial.
+    assert s["se_boot"] == pytest.approx(np.sqrt(0.6 * 0.4 / 100), rel=0.20)
+    # and the whole point: the same rate is less significant when clustered
+    assert abs(c["z"]) < abs(s["z"])
+
+
+def test_the_clustered_test_also_refuses_to_assume_a_null():
+    with pytest.raises(TypeError, match="requires null_rate"):
+        day_clustered_shortening_test(_dated_bets(3, 2), pd.Series([2.0] * 6))
+
+
+def test_the_clustered_test_survives_a_population_with_nothing_in_it():
+    r = day_clustered_shortening_test(pd.DataFrame(), pd.Series(dtype=float),
+                                      null_rate=0.5)
+    assert r["n_bets"] == 0 and r["n_blocks"] == 0
+
+
+def test_too_few_matchdays_returns_no_p_rather_than_a_flattering_one():
+    """The floor exists because the failure is silent and runs the wrong way.
+
+    A cluster bootstrap estimates the error from the spread ACROSS blocks, so
+    with a handful of blocks it estimates it badly and biased downward — and a
+    downward-biased error produces a p SMALLER than the uncorrected one. The
+    correction then looks like it strengthened the result. The forward ledger
+    produced exactly that on 84 bets over 5 days.
+
+    Four days of ten bets each, every day internally identical, so the true
+    error is large and four blocks cannot see it. The rate and the block count
+    still come back — a caller can say how little it has — but z and p do not.
+    """
+    bets = _dated_bets(days=4, per_day=10)
+    close = pd.Series([2.0] * 30 + [2.5] * 10)     # 3 days shortened, 1 not
+
+    r = day_clustered_shortening_test(bets, close, null_rate=0.3,
+                                      n_boot=2000, seed=0)
+    assert r["n_blocks"] == 4 and r["n_bets"] == 40
+    assert r["shortened_rate"] == pytest.approx(0.75)
+    assert pd.isna(r["z"]) and pd.isna(r["pvalue"])
+
+    # Lower the floor and the same data does report one, which is what makes
+    # this a floor rather than a property of the input.
+    loosened = day_clustered_shortening_test(bets, close, null_rate=0.3,
+                                             n_boot=2000, seed=0, min_blocks=2)
+    assert np.isfinite(loosened["z"])
