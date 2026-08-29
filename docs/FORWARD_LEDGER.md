@@ -30,10 +30,11 @@ the same workflow step that commits this ledger, and grades normally from the
 next run onward. Nothing needs fixing.
 
 ```
-          file  rows        committed_at       first_kickoff status
-2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00     ok
-2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00     ok
-2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00     ok
+          file  rows        committed_at       first_kickoff      status
+2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00          ok
+2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00          ok
+2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00          ok
+2026-08-29.csv   164                 NaT 2026-08-29 12:00:00 uncommitted
 ```
 
 ## Coverage
