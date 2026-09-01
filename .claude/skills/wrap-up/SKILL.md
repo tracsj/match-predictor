@@ -1,6 +1,6 @@
 ---
 name: wrap-up
-description: End-of-session capture for match-predictor. Summarises the session, records every hypothesis or configuration evaluated in the registry, captures learnings, applies promotion and pruning, and confirms CLAUDE.md accuracy. Use before closing any session. Do NOT use mid-session to record a single finding — write that straight into the relevant docs/hypotheses entry; and do NOT use it to run or settle a hypothesis, which belongs in its own pre-registered run.
+description: End-of-session capture. Summarises the session, appends skill learnings, commits this session's work. Consolidation (promotion, pruning, CLAUDE.md accuracy, permissions audit) belongs to /housekeeping, not here.
 ---
 
 Before starting, read [wrap-up learnings](learnings.md) and apply any guidance from the Staging section.
@@ -9,17 +9,7 @@ Before we close this session:
 
 1. **Session summary** — 3–5 bullets on what we did today.
 
-2. **Permissions audit** — Check the **`allow` block only** of `.claude/settings.json` (and `settings.local.json` if present) for banned patterns: `node:*`, `python3:*`, `curl:*` (unscoped), `rm:*`, `uv:*` (the bare wildcard includes `uv run`, which is code execution), or any `*:*`.
-
-   **Parse the JSON; do not grep the file.** Several banned strings legitimately appear in the `deny` block — `Bash(rm:*)` is *supposed* to be there — so a text search reports a finding every time and the finding is disproved the same way every time.
-
-   ```python
-   import json; s = json.load(open(".claude/settings.json"))["permissions"]
-   banned = ("node:*", "python3:*", "curl:*", "rm:*", "uv:*", "*:*")
-   print([r for r in s["allow"] if any(b in r for b in banned)] or "clean")
-   ```
-
-3. **Registry reconciliation** — *the project-specific step, and the one most likely to be skipped.*
+2. **Registry reconciliation** — *the project-specific step, and the one most likely to be skipped.*
 
    List every hypothesis, model configuration, feature set, threshold or market variant **evaluated this session**, including ones abandoned after a single look. For each, confirm it appears in `docs/PROGRAMME.md` and that the running count is incremented.
 
@@ -31,31 +21,19 @@ Before we close this session:
 
    Then check: does any hypothesis whose status is `running` now have a result? Move it to `settled` with a link, or to the graveyard.
 
-4. **Learnings** — For each skill used, check if anything worked particularly well or went wrong. Either write a dated entry under `## Staging` in `.claude/skills/<name>/learnings.md` OR explicitly confirm nothing to capture. Then apply promotion + pruning:
-   - Likely to happen again → promote into skill file or CLAUDE.md; delete the Staging entry
-   - Repeated 3+ sessions → same
-   - One-off → leave in Staging only
-   - Older than 30 days, unpromoted → delete
+3. **Learnings** — for each skill used this session, either append a dated entry under `## Staging` in that skill's `.claude/skills/<name>/learnings.md`, or explicitly confirm there is nothing to capture.
 
-   **Age is the signal, never count** *(2026-08-27 — replaced "Staging stays lean, a handful of active observations at most," a retired count in prose)*. A full Staging is usually throughput: across 55 entries measured, 58% were 0–2 days old and only 2 over a fortnight, so a count fires hardest on the best days. Staging is the archive's inbox; git history is the archive.
+   **Insert after the `## Staging` heading — do not append to end of file.** A learnings file may carry a second section (`## Archive`, `## Incident archive`), and a blind append lands the entry where nobody will read it.
 
-5. **Test suite** — Run `uv run pytest -q`. The harness self-tests are what make every number in this repo trustworthy: the cheater probe, the poisoned-split leak guard, the closed-form margin check, the published-band check on the market. **A failure here is not flaky — it means something real broke.** Do not close a session on a red suite without saying so explicitly.
+   **Append only — decide nothing.** Promotion, pruning and the 30-day sweep moved to `/housekeeping` on 2026-09-01. If an entry looks worth promoting, say so inside it and name where you think it belongs; the weekly pass rules on it with every repo in view.
 
-6. **Files** — 150 lines is the wrong threshold for this repo and flagging against it produces noise: 20+ files exceed it and most are cohesive (`net.py` 519, `footballdata.py` 477, `betting.py` 382). **Flag only the top 3, and only when a file has grown since last session or has become genuinely multi-purpose.** A long module that does one thing well is not a finding.
+   **Never restate a size, count or backlog claim you inherited.** Measure it and quote the number you got, or leave it out. Correct a wrong inherited claim in place rather than adding a fresh entry beside it.
 
-7. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, any `PREREG*.md` (the original `PREREGISTRATION.md` plus per-hypothesis ones like `PREREG_PHASE6_NULL.md` — all frozen records, never edited retroactively), `FORWARD_LEDGER.md` (machine-written by the forecast workflow — never edit it by hand), and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
+4. **Test suite** — Run `uv run pytest -q`. The harness self-tests are what make every number in this repo trustworthy: the cheater probe, the poisoned-split leak guard, the closed-form margin check, the published-band check on the market. **A failure here is not flaky — it means something real broke.** Do not close a session on a red suite without saying so explicitly.
 
-8. **Context file descriptions audit** — for any file added to or updated this session, check that its row in CLAUDE.md's "Where the detail lives" table names what is now inside it. If you find one stale or missing, check siblings — staleness clusters.
+5. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, any `PREREG*.md` (the original `PREREGISTRATION.md` plus per-hypothesis ones like `PREREG_PHASE6_NULL.md` — all frozen records, never edited retroactively), `FORWARD_LEDGER.md` (machine-written by the forecast workflow — never edit it by hand), and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
 
-9. **CLAUDE.md accuracy** — Four passes:
-   - *Additions*: anything new this session that should be documented? New data boundaries and new failure modes are the two that matter most here.
-   - *Staleness*: **ask of every claim "is this still true, and is it labelled with what it is true *of*?"** — not "have any numbers moved?". A drifting number is cheap to fix; a conclusion that has quietly become wrong, or a figure carrying no scope, is what misleads the next session. Both recur here. The test count has drifted at every reconciliation (299→302→321→337→344→348). A *conclusion* went stale when the founding study's CLV gloss outlived the null it depended on. And an **unscoped** figure is the same fault wearing different clothes: the CLV rule read "45–48% of selections shorten" as though that were a property of the market, when it is a property of *one price ladder* — the exchange measures 31.8%, and reading one against the other misstates the null by 13 points. Check the code too, not only the docs: `betting.py`'s own docstring advertised a Kelly simulation that has never existed.
-   - *Global*: did anything reveal a universal principle? Before adding to `~/.claude/CLAUDE.md`, pass this 3-question filter — all must pass: (1) behavioral guardrail that prevents a recurring mistake, not reference knowledge; (2) would cause a mistake in *typical* sessions; (3) plausibly applies in 2+ active repos. If not all three → route to skill gotchas, this CLAUDE.md, or `~/.claude/reference/troubleshooting.md`.
-   - *Context budget*: run `python3 ~/.claude/bin/context-budget.py` before adding to `~/.claude/CLAUDE.md` **or** this repo's `CLAUDE.md`. **It reports and never refuses — always exit 0, Stephen's ruling 2026-08-27**, after a saturated ceiling blocked a legitimate addition to a file with only ~160 recoverable words. An `outside` reading is a prompt to rehome, never a reason to withhold an accurate rule: keep the action in the hub, move mechanism and narrative to a spoke. For *what* to rehome read the report's **LARGEST UNITS** list, and `--rate` for house style.
-
-10. **Memory health** — Periodically (every 5–10 sessions) run `/housekeeping`. Skip if last run was recent.
-
-11. **Next-session brief** — *the step whose absence is invisible until the next session opens cold.*
+6. **Next-session brief** — *the step whose absence is invisible until the next session opens cold.*
 
     Update the **"Where we are — read this first"** section at the top of `docs/PROGRAMME.md`: what was finished, what is next in order, and any open thread a fresh session would otherwise rediscover.
 
@@ -63,7 +41,26 @@ Before we close this session:
 
     Write it for someone with no memory of the session. "Continue where we left off" is not a brief; the next concrete action, with the file it touches, is.
 
-12. **Commit wrap-up changes** — Stage and commit any changes made during wrap-up. Scope every commit with a `--` pathspec after the `-m` flags; never `git add .`. For a multi-line message, Write to the scratchpad and use `git commit -F` — inline multi-line `-m` breaks on apostrophes. Run `git status` in **both** the project repo and `~/.claude/`.
+7. **Commit wrap-up changes** — Stage and commit any changes made during wrap-up. Scope every commit with a `--` pathspec after the `-m` flags; never `git add .`. For a multi-line message, Write to the scratchpad and use `git commit -F` — inline multi-line `-m` breaks on apostrophes. Run `git status` in **both** the project repo and `~/.claude/`.
+
+
+## What moved to `/housekeeping` — 2026-09-01
+
+Wrap-up is **capture**; `/housekeeping` is **consolidation**. Nothing was dropped.
+
+| Was a wrap-up step | Now |
+|---|---|
+| Permissions audit | `~/.claude/hooks/git-tenancy-guard.py` blocks whole-worktree staging and `permission-rule-guard.py` blocks a banned allow rule at the moment of writing; `/housekeeping permissions` audits the files weekly. |
+| Promote / prune Staging | `/housekeeping skills` |
+| Cross-session pattern check | `/housekeeping patterns` and `learnings-meta` — they see every repo at once, which is what a cross-session pattern requires |
+| CLAUDE.md accuracy, routing filters, `context-budget.py` | `/housekeeping claude-md` |
+| File-size flags | `/housekeeping skills` |
+| Context-file description audit | `/housekeeping context` |
+| "Periodically run `/housekeeping`" | Deleted — a LaunchAgent rings it Mondays 09:15 |
+
+**Why:** wrap-up was costing a median 41 tool calls per run (worst 93), of which the permissions audit was 23.6% and learnings judgement 30%, against 5% for the commit. And a per-session prune cannot reach a quiet repo, which is where entries actually rot. Baseline: `~/.claude/consolidation-baseline.md`.
+
+**Resist re-adding steps here.** Every wrap-up in the system grew at 73–143 words per edit against a healthy 32–56, in all eleven repos, and a one-time trim regrew past its own peak in twenty days. A new check almost always belongs in `/housekeeping`.
 
 ## Verification
 
@@ -79,22 +76,17 @@ Run `git status` in both repos and `git log --oneline -3` in the project repo as
 
 ```
 Wrap-up complete:
-✓/✗ Step 1  — Session summary (N bullets)
-✓/✗ Step 2  — Permissions audit (clean / fixed N rules)
-✓/✗ Step 3  — Registry reconciliation (N configs recorded; count X → Y)
-✓/✗ Step 4  — Learnings (skills: X, Y — entries written / nothing to capture)
-✓/✗ Step 5  — Test suite (N passed / N failed)
-✓/✗ Step 6  — Large files (clean / flagged X)
-✓/✗ Step 7  — Stale working-doc scan (clean / deleted or relocated N)
-✓/✗ Step 8  — Context file descriptions audit (clean / updated N)
-✓/✗ Step 9  — CLAUDE.md (N additions / nothing stale / global check)
-✓/✗ Step 10 — Memory health (skipped / ran /housekeeping)
-✓/✗ Step 11 — Next-session brief updated in docs/PROGRAMME.md
-✓/✗ Step 12 — Changes committed; git status clean (project + ~/.claude)
+✓/✗ Step 1 — Session summary (N bullets)
+✓/✗ Step 2 — Registry reconciliation (N configs recorded; count X → Y)
+✓/✗ Step 3 — Learnings
+✓/✗ Step 4 — Test suite
+✓/✗ Step 5 — Stale working-doc scan (clean / deleted or relocated N)
+✓/✗ Step 6 — Next-session brief
+✓/✗ Step 7 — Commit wrap-up changes
 ```
 
 If any step is ✗, state why before closing.
 
 ## Final step — Capture learnings
 
-If a wrap-up step behaved unexpectedly — skipped, fired incorrectly, or a pattern recurred — append a dated entry under `## Staging` in `learnings.md`. Apply promotion + pruning per the global CLAUDE.md rules.
+If a wrap-up step behaved unexpectedly — skipped, fired incorrectly, or a pattern recurred — append a dated entry under `## Staging` in `learnings.md`. Do not promote or prune it here — `/housekeeping` owns that.
