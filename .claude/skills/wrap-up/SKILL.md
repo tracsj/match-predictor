@@ -23,7 +23,7 @@ Before we close this session:
 
 3. **Learnings** — for each skill used this session, either append a dated entry under `## Staging` in that skill's `.claude/skills/<name>/learnings.md`, or explicitly confirm there is nothing to capture.
 
-   **Insert after the `## Staging` heading — do not append to end of file.** A learnings file may carry a second section (`## Archive`, `## Incident archive`), and a blind append lands the entry where nobody will read it.
+   **Insert INSIDE the `## Staging` section — neither above the heading nor below a later one.** A learnings file may carry a second section (`## Archive`, `## Incident archive`), so a blind append lands the entry where nobody will read it; and anchoring an Edit on the file's H1 lands it ABOVE the heading, which is the same fault mirrored and is the one that actually happened — twice in one session, 2026-09-03, in two different repos' files. Either way the entry is swept by nothing. Gated by `python3 ~/.claude/bin/learnings-placement.py`, which walks every learnings file in every repo.
 
    **Append only — decide nothing.** Promotion, pruning and the 30-day sweep moved to `/housekeeping` on 2026-09-01. If an entry looks worth promoting, say so inside it and name where you think it belongs; the weekly pass rules on it with every repo in view.
 
