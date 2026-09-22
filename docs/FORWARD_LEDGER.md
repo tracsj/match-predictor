@@ -30,24 +30,24 @@ the same workflow step that commits this ledger, and grades normally from the
 next run onward. Nothing needs fixing.
 
 ```
-          file  rows        committed_at       first_kickoff      status
-2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00          ok
-2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00          ok
-2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00          ok
-2026-08-29.csv   164 2026-08-29 02:12:11 2026-08-29 12:00:00          ok
-2026-09-01.csv    48 2026-09-01 18:33:38 2026-09-01 19:45:00          ok
-2026-09-04.csv   178 2026-09-04 20:52:58 2026-09-05 12:00:00          ok
-2026-09-11.csv   169 2026-09-11 20:57:57 2026-09-12 12:00:00          ok
-2026-09-15.csv    29 2026-09-15 18:54:32 2026-09-15 19:00:00          ok
-2026-09-18.csv   177                 NaT 2026-09-19 12:00:00 uncommitted
+          file  rows        committed_at       first_kickoff status
+2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00     ok
+2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00     ok
+2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00     ok
+2026-08-29.csv   164 2026-08-29 02:12:11 2026-08-29 12:00:00     ok
+2026-09-01.csv    48 2026-09-01 18:33:38 2026-09-01 19:45:00     ok
+2026-09-04.csv   178 2026-09-04 20:52:58 2026-09-05 12:00:00     ok
+2026-09-11.csv   169 2026-09-11 20:57:57 2026-09-12 12:00:00     ok
+2026-09-15.csv    29 2026-09-15 18:54:32 2026-09-15 19:00:00     ok
+2026-09-18.csv   177 2026-09-18 20:52:36 2026-09-19 12:00:00     ok
 ```
 
 ## Coverage
 
-- Predictions committed: **761**
-- Results landed: **755**
+- Predictions committed: **938**
+- Results landed: **932**
 - Awaiting result: **6**
-- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-09-17 20:30:00
+- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-09-20 20:30:00
 
 ## Schedule coverage
 
@@ -56,19 +56,19 @@ kickoff slot, and whether a prediction exists for it. **A miss here is not a
 bad prediction — it is no prediction at all**, which is the failure mode that
 does not announce itself.
 
-- Fixtures in scope: **863** across 22 divisions
-- Predicted: **755**
-- Missed: **108**
+- Fixtures in scope: **1,061** across 22 divisions
+- Predicted: **932**
+- Missed: **129**
 
 Worst slots first. Friday early kickoffs are the known suspect.
 
 ```
 weekday  hour  fixtures  predicted  missed
-    Fri    19        60         10      50
-    Fri    20        16          3      13
+    Fri    19        75         10      65
+    Fri    20        19          3      16
     Mon    15        11          0      11
-    Fri    17         6          0       6
-    Fri    18         5          0       5
+    Fri    17         8          0       8
+    Fri    18         6          0       6
     Tue    19        49         44       5
     Thu    20         8          4       4
     Wed    20         9          5       4
@@ -82,9 +82,9 @@ weekday  hour  fixtures  predicted  missed
 
 ```
                          model   n    rps  log_loss  brier    ece  accuracy
-             the net (forward) 755 0.2090    1.0140 0.6064 0.0244    0.4834
-market, exchange close (n=755) 755 0.2041    0.9977 0.5963 0.0299    0.5033
-          the net, same subset 755 0.2090    1.0140 0.6064 0.0244    0.4834
+             the net (forward) 932 0.2100    1.0194 0.6107 0.0221    0.4732
+market, exchange close (n=932) 932 0.2049    1.0025 0.5997 0.0287    0.4946
+          the net, same subset 932 0.2100    1.0194 0.6107 0.0221    0.4732
 ```
 
 The market band to sanity-check against is RPS 0.19–0.21. Outside it, suspect
@@ -108,16 +108,16 @@ overround line below is what makes the difference legible rather than surprising
 
 ```
     taken_at  n_bets  n_days  mean_ratio  pct_shortened  null_rate  excess_pp  two_prop_p  day_clustered_p
-exchange_pre     396      20      0.9820         0.3889     0.3388     5.0094      0.0569           0.0047
+exchange_pre     499      22      0.9809         0.3928     0.3393     5.3500      0.0227           0.0008
 ```
 
 **The mechanism, on these rows.** The pre-close book sums to
-1.0470 and the close to 1.0122, tightening in 88% of 742 rows.
+1.0469 and the close to 1.0116, tightening in 87% of 918 rows.
 That is where the default lengthening comes from, and it is measured rather
 than assumed.
 
 **Treat this as an early number, not a finding.** The null is itself an
-estimate, from **1892** eligible cells, and a binomial against
+estimate, from **2352** eligible cells, and a binomial against
 it would treat it as exact. `two_prop_p` does not, and accounts for that.
 
 **`day_clustered_p` is the one to read, and it needs matchdays to read.**
@@ -139,10 +139,10 @@ clears the p < 0.01 this project requires before claiming an edge.
 
 ```
        price_set  n_eligible  n_bets     roi  roi_lo  roi_hi  hit_rate  avg_odds                                  note
-  exchange_close         755     481 -0.0015 -0.1348  0.1481    0.3202    3.3803  the sharpest price still in the feed
-      b365_close         755     328 -0.0573 -0.2009  0.1758    0.3049    3.3506 a book you could hold an account with
-market_max_close         755     427 -0.0873 -0.3170  0.0842    0.2951    3.3589                      optimistic bound
-market_avg_close         755     320 -0.0972 -0.2833  0.1396    0.2969    3.3103        softer benchmark, for coverage
+  exchange_close         932     586 -0.0394 -0.1486  0.0873    0.3038    3.3982  the sharpest price still in the feed
+      b365_close         932     399 -0.0706 -0.1949  0.1079    0.2932    3.3521 a book you could hold an account with
+market_max_close         932     520 -0.1020 -0.2991  0.0253    0.2846    3.3814                      optimistic bound
+market_avg_close         932     384 -0.1141 -0.2739  0.0741    0.2839    3.3385        softer benchmark, for coverage
 ```
 
 Rule: pre-registered: ev>=0.05, odds 1.5-5.0: bet the max-EV outcome when EV >= +0.050 and price in [1.5, 5.0] — fixed by `docs/PREREGISTRATION.md`.
