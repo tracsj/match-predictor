@@ -6,13 +6,44 @@
 
 ## Where we are — read this first
 
-**Last session: 2026-08-27 (second session that day).** Three things were fixed that nobody had listed as broken, and programme item 2 was closed. **Count holds at 49; 348 tests green.**
+**Last session: 2026-09-29.** The Tuesday forward run failed, and the cause was upstream. **GitHub had started every scheduled run 2h22m–7h43m late**, and on 09-29 the Championship-night fixtures kicked off during training. The guard refused the file correctly, but it also threw away the 2 fixtures still to come. `scripts/forward_coverage_attribution.py` then accounted for the 134 fixtures no run had ever predicted:
+
+- **87 were lost to lateness**: all 86 Friday 19:00/20:00 misses, plus one on a Tuesday.
+- 21 were lost to the 09-08 HTTP 503 outage.
+- 11 the feed could not reach: 10 Friday 17:30/18:00 kickoffs and one Tuesday 13:00.
+- 15 were absent from their run's file.
+
+The facts are in `docs/research/00-measured-facts.md`. Fixed and pushed (`7b1ebc1`, `78cdc35`):
+
+- A run drops late fixtures instead of refusing the file, and warns on the Actions page when fixtures were never predicted.
+- There is one file per run (`predictions/<UTC>.csv`).
+- There are four cron slots each on Tuesday and Friday.
+- Checkout fetches the branch tip, so a queued run sees the earlier run's file.
+
+A manual dispatch then predicted the 2 rescued fixtures and committed them before kickoff. **Count holds at 49; 352 tests green.**
+
+**Check first next session: did the retry slots work?** Run `gh run list --workflow forecast.yml -L 12`:
+
+- Tuesday 2026-10-06 and Friday 10-09 should each show several `schedule` rows.
+- Later runs should print `skipping N fixtures already predicted` rather than re-predicting, and none should show a rejected push.
+- Then read the ledger's Schedule coverage table for Fri 19/20. If Friday evenings are still missed, GitHub's delay is outrunning the slots, and the fallback is a local `launchd` job that triggers the workflow manually (`gh workflow run forecast.yml`). Stephen chose slots first on 2026-09-29.
+
+**Two small forward-ledger defects, found and not fixed:**
+
+- 3 rows in `predictions/2026-08-18.csv` carry old team keys (`atl madrid`, `bradford city`, `rayo vallecano`), so they never join a result.
+- `F1|20260823|paris sg|rennes` was predicted with home and away swapped relative to the result.
+
+The committed files must not be edited. The candidate fix is for `src/grade.py` to re-derive the key from `home_raw`/`away_raw` at grade time. Whether that is honest for the swapped fixture is an open question: the prediction was for the other venue.
+
+**After that, the next concrete action is unchanged:** the n-outcome harness generalisation (item 4 below).
+
+**Session 2026-08-27 (second session that day).** Three things were fixed that nobody had listed as broken, and programme item 2 was closed. **Count holds at 49; 348 tests green.**
 
 **The next concrete action: the n-outcome harness generalisation** — roughly 23 lines across `src/eval/metrics.py`, `src/models/net.py`, `src/models/baselines.py` and `src/eval/betting.py`, moving sport-specific code under `src/sports/football/`. `devig.py` and `split.py` already generalise. It is item 4 below and it is now the *only* thing standing in front of both remaining hypotheses, which makes the H2-vs-H4 ordering question moot until it is done. Do it as its own change with its own tests: a two-outcome bug looks exactly like a two-outcome edge.
 
 **Carry one small item into that change.** `two_proportion_p` currently lives in `src/grade.py`, which has grown from a grading module into one that also holds statistics. It is a general statistic with one caller; `src/eval/` is where it belongs. The generalisation touches `betting.py` anyway, so that is the cheap moment to move it. `grade.py` is 537 lines and `betting.py` 545 — both grew this session, and `betting.py` is still cohesive while `grade.py` is the one drifting.
 
-**⚠️ The forward workflow's cron has never fired on this repository.** Three manual dispatches succeeded on 2026-08-27 and the workflow is registered and `active` with both cron lines on `master`, but every run so far is a `workflow_dispatch`. **The first scheduled fire is Friday 2026-08-28 at 17:15 UTC.** Confirm it landed: `gh run list --workflow=forecast.yml --limit 3` should show a row with event `schedule`. If it did not, the cause is not the file — check that the repository has not been marked inactive and that `master` is still the default branch.
+~~**⚠️ The forward workflow's cron has never fired on this repository.**~~ *Answered: it has fired on every Tuesday and Friday since 08-28. It fires hours late, which is the 2026-09-29 session's subject.* Three manual dispatches succeeded on 2026-08-27 and the workflow is registered and `active` with both cron lines on `master`, but every run so far is a `workflow_dispatch`. **The first scheduled fire is Friday 2026-08-28 at 17:15 UTC.** Confirm it landed: `gh run list --workflow=forecast.yml --limit 3` should show a row with event `schedule`. If it did not, the cause is not the file — check that the repository has not been marked inactive and that `master` is still the default branch.
 
 **Session 2026-08-27.** The forward workflow was rescued from a publishing accident, and the CLV null correction finally reached the code. **Count unchanged at 49** — nothing here fitted a model or searched for edge.
 
@@ -66,7 +97,9 @@ And **29 cells across 12 odds columns carry a price ≤ 1.0** — missing data w
 
    **The forward ledger inherits the same test and cannot use it yet.** 84 bets over 5 matchdays. A cluster bootstrap over a handful of blocks estimates the error downward and returns a p *smaller* than the uncorrected one — which is the correction failing while looking like it worked, and is what the first version of this printed. There is now a 20-block floor, and the ledger prints blank until the forward record reaches it.
 
-3. **Read the ledger's "Schedule coverage" table after a few weeks.** There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
+3. ~~**Read the ledger's "Schedule coverage" table after a few weeks.**~~ **Measured 2026-09-29, and the paragraph below was half wrong.** The Friday 17:30/18:00 kickoffs are unreachable, as it says (10 fixtures). But all 86 Friday 19:00/20:00 misses were lateness, which a cron change *does* fix. See the handoff above.
+
+   *As written 2026-08-27:* There is a known structural gap and it is measured rather than assumed. The earliest observed Friday kickoff is **17:30 UK**, while the Friday run fires 18:15 UK under BST and takes ~20 minutes — so Friday early kickoffs can only ever be reached from *Tuesday's* snapshot, and whether that snapshot spans to Friday is not something one observation could settle. **No cron change fixes this**: the feed has exactly two states a week. If the table shows Friday-evening misses accumulating, the options are a cached model fast enough to fit between the 17:00 upload and a 17:30 kickoff, or accepting the gap and saying so.
 
 4. **n-outcome harness generalisation** + move sport-specific code under `src/sports/football/`. ~23 lines across `metrics.py`, `net.py`, `baselines.py`, `betting.py`; `devig.py` and `split.py` already generalise. H2 forces this first, H4 needs the two-outcome case.
 
@@ -110,6 +143,16 @@ The deliverable is the testing machine plus honest findings. A dozen well-killed
 ## The count
 
 **Configurations evaluated to date: 49.**
+
+**Reconciled 2026-09-29: the count holds at 49.** The session was operational: the forward workflow's failure and the schedule behind it. Five things ran, and none of them is a configuration:
+
+| what ran | why it does not count |
+|---|---|
+| `src.forward --as-of "2026-09-29 19:05"` (dry run) | the pre-registered configuration, with no rule scored and nothing written. It exercised the new drop-and-warn path |
+| the 2026-09-29 dispatched forward run (2 predictions) | a scheduled-style retrain of the same configuration, per the 2026-08-17 ruling below |
+| `scripts/forward_coverage_attribution.py` | audits which fixtures were never predicted and why. Fits nothing, scores nothing |
+| `SAFETY_MARGIN = 15 min` in `src/forward.py` | decides which fixtures are *eligible* for prediction by clock time, and was chosen from grade/commit step timing, never from results |
+| the four-and-four cron slots | when runs start, not what they predict |
 
 **Reconciled 2026-08-27 (second session that day): the count holds at 49.** Nine things ran and none is a configuration. Named individually rather than summarised, because "nothing else was evaluated" is indistinguishable from having skipped the step:
 

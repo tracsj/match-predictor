@@ -349,7 +349,7 @@ def build_report(verbose: bool = True) -> str:
     #
     # Measured 2026-09-29 (scripts/forward_coverage_attribution.py): the Tuesday
     # snapshot does NOT reach Friday, so 17:30/18:00 Friday kickoffs are lost to
-    # the feed. But 81 of the Fri 19:xx/20:xx misses were LATENESS -- GitHub
+    # the feed. But all 86 Fri 19:xx/20:xx misses were LATENESS -- GitHub
     # started the Friday cron 2-7h late, after kickoff. Those a punctual run
     # catches. See docs/research/00-measured-facts.md.
     covered_divs = sorted(graded["div"].dropna().unique())

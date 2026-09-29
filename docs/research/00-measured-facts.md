@@ -400,12 +400,12 @@ Manual dispatches started within a minute. The workflow runs about 11 minutes on
 
 | cause | fixtures | where |
 |---|---|---|
-| lateness: an on-time run would have caught it | **87** | Fri 19:xx and 20:xx (81), plus 5 Friday-19:xx fixtures on 09-25 and one on Tuesday |
+| lateness: an on-time run would have caught it | **87** | every Fri 19:xx and 20:xx miss (86), plus one Tuesday 18:xx |
 | failed run | 21 | 09-08, when every current-season file returned **HTTP 503**. The outage was transient, and the next run was clean |
 | absent from the file for its date | 15 | 11 are National League fixtures on the 2026-08-31 bank-holiday Monday, which the feed never listed. 3 are team-key mismatches in `2026-08-18.csv`: it holds `atl madrid`, `sheffield wed`, `bradford city` and `rayo vallecano`, while the corpus now keys `ath madrid`, `sheffield weds`, `bradford` and `vallecano`, so those predictions never join. 1 is a home/away swap: the file has `F1\|20260823\|paris sg\|rennes`, the result is `rennes\|paris sg` |
 | feed window | 11 | Fri 17:30/18:00 kickoffs, which the Tuesday feed does not reach and which fall before an on-time Friday run finishes. Also one Tuesday 13:00 |
 
-**This overturns part of the `src/grade.py` coverage comment.** It said no cron change could fix the Friday misses. That holds for the 17:30 and 18:00 kickoffs, the 11 in the feed-window row. It does not hold for the 81 at 19:00 and later: an on-time 18:15 UK run reaches those, and a late one does not.
+**This overturns part of the `src/grade.py` coverage comment.** It said no cron change could fix the Friday misses. That holds for the 17:30 and 18:00 kickoffs, 10 of the 11 in the feed-window row. It does not hold for the 86 at 19:00 and later: an on-time 18:15 UK run reaches those, and a late one does not.
 
 **Two gaps that were not bugs:** 09-22's "no upcoming fixtures" and 09-25's 36-fixture file (E2, E3, EC, SP2 only). The corpus has no fixtures in the other 18 divisions on 22–24 or 26–28 Sep, so this was an international break. Every fixture in the 22 divisions on 26–28 Sep was predicted.
 

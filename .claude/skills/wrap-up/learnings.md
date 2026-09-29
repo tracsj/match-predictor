@@ -2,6 +2,12 @@
 
 ## Staging
 
+### 2026-09-29 — a second "claim about itself" case, and this one steered a month of reading
+
+The 08-27 entry below (claims rather than computations) recurred. A `src/grade.py` comment said *"No cron change fixes this"* about the Friday misses, and the PROGRAMME handoff repeated it. For a month, nobody measured it. When `scripts/forward_coverage_attribution.py` did, all 86 Friday 19:00/20:00 misses were lateness, which a cron change does fix. The claim was an inference from one mechanism (the 17:30 kickoff) generalised to a whole slot. The handoff's "cron has never fired" warning had also sat unanswered for a month, because no session opened between the schedule starting and the failure.
+
+Second occurrence of the pattern. It may belong in `/housekeeping`: a check that the "Where we are" section's open checks are dated, and that any past their date gets flagged. Not proposed as a wrap-up step.
+
 ### 2026-08-27 (2nd session) — step 3 argued nine things down, and the hardest one flipped a sign
 
 The reconciliation's real work was again subtraction, and one candidate was genuinely hard rather than obviously a control. `measured_shortening_null` changed the forward ledger's CLV reading from p 0.44 to a nominal p 0.031 — a sign flip, which is what an evaluation looks like from the outside. **The test that settled it was not "did the number move?" but "was an alternative tried and discarded?"** It was not: the bet population was fixed by a committed workflow before the null existed, and the null is a property of the market rather than of any model. What changed was the yardstick, not the search.
