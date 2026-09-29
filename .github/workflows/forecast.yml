@@ -61,9 +61,16 @@ jobs:
       # file committed in an earlier run has no history, so file_committed_at
       # returns None, every prediction reads as "uncommitted", and the ledger
       # grades nothing at all -- silently, and while reporting success.
+      #
+      # ref is REQUIRED too, because of the retry slots. Without it checkout
+      # takes the commit that was current when the run was CREATED. A run that
+      # was created late and then queued behind another would check out a tree
+      # without the earlier run's prediction file, predict the same fixtures
+      # again, and have its push rejected.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
       # Pinned exactly, not to a major tag: astral-sh/setup-uv publishes major
       # tags only up to v7 while its current release is v10.0.1, so `@v10` does

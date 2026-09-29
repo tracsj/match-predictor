@@ -40,6 +40,7 @@ from src.grade import corpus_in_window
 
 # (weekday, UTC time) -- Tue 13:15 and Fri 17:15, the cron until 2026-09-29.
 SLOTS = ((1, "13:15"), (4, "17:15"))
+SLOTS_VALID_UNTIL = pd.Timestamp("2026-09-29 23:59:59")  # extend with SLOTS
 RUN_TIME = pd.Timedelta(minutes=25)
 UK = "Europe/London"
 
@@ -79,6 +80,9 @@ def main() -> None:
     divs = sorted(allp["div"].dropna().unique())
     lo = allp["kickoff"].min()
     hi = uk(pd.Timestamp.now(tz="UTC")).normalize() - pd.Timedelta(seconds=1)
+    # SLOTS stops being the schedule after this date. Measuring past it would
+    # blame fixtures on slots that no longer existed, and nothing would say so.
+    hi = min(hi, SLOTS_VALID_UNTIL)
 
     scope = corpus_in_window(divs, lo, hi)
     scope["kickoff"] = pd.to_datetime(scope["kickoff"])
