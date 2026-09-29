@@ -1,0 +1,3 @@
+predicted_at,match_id,kickoff,div,league,season,home_raw,away_raw,home_key,away_key,p_home,p_draw,p_away,bfeh,bfed,bfea,b365h,b365d,b365a,maxh,maxd,maxa,avgh,avgd,avga
+2026-09-29T21:40:02,EC|20260930|eastleigh|southend,2026-09-30 19:45,EC,England National League,2026-27,Eastleigh,Southend,eastleigh,southend,0.2378990778382026,0.25356373920264924,0.5085371829591481,3.85,3.6,1.77,4.1,3.8,1.7,4.1,4.0,1.78,3.85,3.75,1.73
+2026-09-29T21:40:02,EC|20260930|tamworth|sutton,2026-09-30 19:45,EC,England National League,2026-27,Tamworth,Sutton,tamworth,sutton,0.4114411156705942,0.2588616459826286,0.32969723834677706,2.26,3.55,2.86,2.25,3.6,2.7,2.25,3.6,2.8,2.23,3.48,2.72
