@@ -26,6 +26,7 @@ feed. What changed is the benchmark it gets graded against, not its inputs.
 from __future__ import annotations
 
 import argparse
+import os
 import time
 from pathlib import Path
 
@@ -33,7 +34,7 @@ import numpy as np
 import pandas as pd
 
 from src.data.footballdata import REPO_ROOT, build_matches, refresh_current
-from src.data.fixtures import build_fixtures, uk_now_naive
+from src.data.fixtures import build_fixtures, describe_fixtures, load_fixtures, uk_now_naive
 from src.features.build import build_forward
 from src.features.horizon import UNPLAYED_COL
 from src.models.baselines import ALL_FEATURES
@@ -51,6 +52,12 @@ SEEDS = (0, 1, 2)
 PRICE_COLS = ["bfeh", "bfed", "bfea", "b365h", "b365d", "b365a",
               "maxh", "maxd", "maxa", "avgh", "avgd", "avga"]
 
+# A fixture kicking off within this long of NOW is not predicted. The file is
+# graded only if its commit precedes every kickoff inside it, and the grade and
+# commit steps still have to run after it is written -- so a fixture kicking off
+# in that gap would get the WHOLE file refused, not just its own row.
+SAFETY_MARGIN = pd.Timedelta(minutes=15)
+
 OUT_COLS = (["predicted_at", "match_id", "kickoff", "div", "league", "season",
              "home_raw", "away_raw", "home_key", "away_key",
              "p_home", "p_draw", "p_away"] + PRICE_COLS)
@@ -65,6 +72,46 @@ def already_predicted() -> set[str]:
         except (ValueError, KeyError, pd.errors.EmptyDataError):
             continue
     return seen
+
+
+def warn(msg: str) -> None:
+    """Print, and on a GitHub runner also raise an annotation on the run page.
+
+    For losses that must not fail the run but must not pass unseen either.
+    """
+    print(f"  ! {msg}")
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::warning::{msg}")
+
+
+def prediction_path(started_utc: pd.Timestamp) -> Path:
+    """One file per RUN, named for the run's UTC start.
+
+    Never one file per day. `src.grade` dates a file by its LAST commit and
+    refuses it if that commit is not before its EARLIEST kickoff, so a second run
+    appending to a same-day file could un-grade every row the first run wrote.
+    """
+    return PREDICTIONS_DIR / f"{pd.Timestamp(started_utc):%Y-%m-%dT%H%MZ}.csv"
+
+
+def drop_late(df: pd.DataFrame, deadline: pd.Timestamp) -> tuple[pd.DataFrame, int]:
+    """Keep rows kicking off strictly after `deadline`; return them and the drop count."""
+    if df.empty:
+        return df, 0
+    late = pd.to_datetime(df["kickoff"]) <= deadline
+    return df[~late].reset_index(drop=True), int(late.sum())
+
+
+def unpredicted_late(feed: pd.DataFrame, seen: set[str],
+                     deadline: pd.Timestamp) -> pd.DataFrame:
+    """Fixtures in the feed that are already too late AND were never predicted.
+
+    The feed retains played fixtures, and those an earlier run predicted are
+    expected. What is left is the loss a late start causes, which the kickoff
+    filter in `load_fixtures` would otherwise discard without a word.
+    """
+    k = pd.to_datetime(feed["kickoff"])
+    return feed[(k <= deadline) & ~feed["match_id"].isin(seen)].reset_index(drop=True)
 
 
 def fit_and_predict_forward(train: pd.DataFrame, horizon: pd.DataFrame,
@@ -105,6 +152,7 @@ def run(refresh: bool = True, verbose: bool = True,
     against a window that has already resolved, which is the only way to check
     the grader before trusting it live. The scheduled job never passes it.
     """
+    started_utc = pd.Timestamp.now(tz="UTC")
     now = uk_now_naive() if as_of is None else pd.Timestamp(as_of)
 
     if refresh:
@@ -123,11 +171,27 @@ def run(refresh: bool = True, verbose: bool = True,
     # precisely because src.refresh already ran -- reached a cold runner with no
     # fixtures.csv at all. The cache is used only to replay a resolved window.
     fixtures = build_fixtures(refresh=as_of is None, now=now)
+    seen = already_predicted()
+
+    # What the feed held when this run read it. The server sends no
+    # Last-Modified header, so this log line is the only record of when an
+    # upload landed.
+    feed = load_fixtures(now=pd.Timestamp("1900-01-01"))
+    if verbose:
+        describe_fixtures(feed, "  feed")
+    missed = unpredicted_late(feed, seen, now + SAFETY_MARGIN)
+    if len(missed):
+        warn(f"{len(missed)} fixtures in the feed kicked off (or kick off within "
+             f"{SAFETY_MARGIN.seconds // 60} minutes) before this run could predict "
+             f"them, and no earlier run did: "
+             f"{missed['kickoff'].min()} -> {missed['kickoff'].max()}, "
+             f"{', '.join(sorted(missed['div'].unique()))}")
+
+    fixtures, _ = drop_late(fixtures, now + SAFETY_MARGIN)
     if fixtures.empty:
         print("no upcoming fixtures in the feed window; nothing to predict")
         return None
 
-    seen = already_predicted()
     fresh = fixtures[~fixtures["match_id"].isin(seen)].copy()
     if len(fresh) < len(fixtures):
         print(f"  skipping {len(fixtures) - len(fresh)} fixtures already predicted "
@@ -166,17 +230,19 @@ def run(refresh: bool = True, verbose: bool = True,
     for c in PRICE_COLS:
         out[c] = horizon[c].to_numpy() if c in horizon.columns else np.nan
 
-    # A prediction file containing a fixture that has already kicked off is
-    # worthless, and would not otherwise announce itself. Training takes
-    # minutes, so this is re-checked against the clock as it stands NOW rather
-    # than as it stood when the horizon was selected.
-    deadline = now if as_of is not None else uk_now_naive()
-    late = pd.to_datetime(out["kickoff"]) <= deadline
-    if late.any() and as_of is None:
-        raise RuntimeError(
-            f"{int(late.sum())} fixtures kicked off during the run; refusing to write "
-            "a prediction file that claims to precede them"
-        )
+    # A prediction for a fixture that has already kicked off is worthless, and
+    # would not otherwise announce itself. Training takes minutes, so this is
+    # re-checked against the clock as it stands NOW rather than as it stood when
+    # the horizon was selected. Late rows are DROPPED, not the whole file: on
+    # 2026-09-29 refusing the file also threw away the fixtures still to come.
+    deadline = (now if as_of is not None else uk_now_naive()) + SAFETY_MARGIN
+    out, n_late = drop_late(out, deadline)
+    if n_late:
+        warn(f"{n_late} fixtures kicked off during the run and were dropped; "
+             f"{len(out)} remain")
+    if out.empty:
+        warn("every fixture in this run kicked off before it finished; nothing written")
+        return None
 
     if as_of is not None:
         # A back-dated run is not evidence of anything and must never land in
@@ -188,11 +254,9 @@ def run(refresh: bool = True, verbose: bool = True,
         return None
 
     PREDICTIONS_DIR.mkdir(parents=True, exist_ok=True)
-    dest = PREDICTIONS_DIR / f"{now.date()}.csv"
+    dest = prediction_path(started_utc)
     if dest.exists():
-        prior = pd.read_csv(dest)
-        out = pd.concat([prior, out[~out["match_id"].isin(prior["match_id"])]],
-                        ignore_index=True)
+        raise RuntimeError(f"{dest.name} already exists; a committed file is never rewritten")
     out[OUT_COLS].to_csv(dest, index=False)
     print(f"wrote {dest.relative_to(REPO_ROOT)} -- {len(out)} predictions")
     return dest

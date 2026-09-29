@@ -1,6 +1,6 @@
 # predictions/
 
-One CSV per run day, written by `uv run python -m src.forward` and committed by
+One CSV per run, named for the run's UTC start (`2026-09-29T1307Z.csv`; files before 2026-09-30 are named by day), written by `uv run python -m src.forward` and committed by
 `.github/workflows/forecast.yml`. Graded by `uv run python -m src.grade`, which
 rewrites `docs/FORWARD_LEDGER.md` from whatever is in here.
 

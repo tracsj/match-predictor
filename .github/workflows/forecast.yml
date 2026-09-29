@@ -12,18 +12,33 @@ name: forward forecast
 # leaves a five-day gap in which fixtures are silently never predicted.
 #
 # DST. Cron here is UTC only, while both upload deadlines are UK local, so a
-# fixed UTC time drifts an hour across the BST boundary. These two are after the
-# upload in BOTH regimes and still comfortably before a 19:45 UK kickoff:
-#   13:15 UTC Tue = 14:15 BST / 13:15 GMT   (both after the 13:00 UK upload)
-#   17:15 UTC Fri = 18:15 BST / 17:15 GMT   (both after the 17:00 UK upload)
+# fixed UTC time drifts an hour across the BST boundary.
+#
+# LATENESS. GitHub starts scheduled runs when it has capacity, not on time.
+# Measured 2026-08-28 -> 09-29: Tuesday runs started 4h-5h22m late and Friday
+# runs 2h22m-7h43m late, and 87 of 134 never-predicted fixtures were lost to
+# that alone (scripts/forward_coverage_attribution.py; docs/research/
+# 00-measured-facts.md). So each day gets several slots, and whichever starts
+# first predicts. Repeat runs are safe: a fixture already in any committed file
+# is skipped, and each run writes its own file, so a later run can never change
+# an earlier one's commit time. Minutes are off the hour because the top of the
+# hour is when GitHub's scheduler is most congested.
+#
+#   Tue 13:07-16:07 UTC  all after the 13:00 UK upload in both regimes
+#   Fri 16:07, 16:37 UTC after the 17:00 UK upload in BST only; in GMT they
+#                        may find nothing new, which costs nothing
+#   Fri 17:07, 17:37 UTC after the upload in both regimes
+#
+# The 17:30/18:00 UK Friday kickoffs are only reachable by an early BST slot
+# that starts on time. The Tuesday feed does not reach Friday.
 
 # Run history before 2026-08-27 lives in tracsj/match-predictor-archive, the
 # private repo this one was published from. See predictions/README.md.
 
 on:
   schedule:
-    - cron: "15 13 * * 2"
-    - cron: "15 17 * * 5"
+    - cron: "7 13,14,15,16 * * 2"
+    - cron: "7,37 16,17 * * 5"
   workflow_dispatch:
 
 permissions:

@@ -207,6 +207,8 @@ def test_no_refresh_still_fetches_the_fixtures_feed(monkeypatch):
         return pd.DataFrame()          # empty horizon ends run() early
 
     monkeypatch.setattr(fwd, "build_fixtures", fake_build_fixtures)
+    monkeypatch.setattr(fwd, "load_fixtures",
+                        lambda now=None: pd.DataFrame(columns=["match_id", "kickoff", "div"]))
 
     fwd.run(refresh=False, verbose=False)
     assert calls["refresh"] is True, "a live run must fetch the fixtures feed"
@@ -244,3 +246,60 @@ def test_fixture_match_id_matches_the_corpus_formula():
     expected = (f"{row['div']}|{d.year:04d}{d.month:02d}{d.day:02d}"
                 f"|{normalize_team(row['home_raw'])}|{normalize_team(row['away_raw'])}")
     assert row["match_id"] == expected
+
+
+# --------------------------------------------------------------------------
+# A late start loses the late fixtures, never the whole run, and says so
+# --------------------------------------------------------------------------
+
+def _fixtures(kickoffs, ids=None) -> pd.DataFrame:
+    ids = ids or [f"E1|x|h{i}|a{i}" for i in range(len(kickoffs))]
+    return pd.DataFrame({"match_id": ids, "kickoff": pd.to_datetime(kickoffs), "div": "E1"})
+
+
+def test_late_rows_are_dropped_and_the_rest_kept():
+    """2026-09-29 regression: 9 of 11 fixtures kicked off during training and
+    the run refused the whole file, throwing away the 2 still to come. A row
+    inside the safety margin goes too, since the commit has not happened yet."""
+    from src.forward import SAFETY_MARGIN, drop_late
+
+    now = pd.Timestamp("2026-09-29 19:50")
+    df = _fixtures(["2026-09-29 19:45",                      # already kicked off
+                    now + SAFETY_MARGIN - pd.Timedelta(minutes=1),  # inside the margin
+                    "2026-09-29 20:30"])                     # still to come
+    kept, n = drop_late(df, now + SAFETY_MARGIN)
+    assert n == 2
+    assert kept["kickoff"].tolist() == [pd.Timestamp("2026-09-29 20:30")]
+
+
+def test_all_late_leaves_nothing_and_does_not_raise():
+    from src.forward import drop_late
+
+    df = _fixtures(["2026-09-29 19:45", "2026-09-29 19:45"])
+    kept, n = drop_late(df, pd.Timestamp("2026-09-29 20:00"))
+    assert n == 2 and kept.empty
+
+
+def test_two_runs_on_one_day_write_two_files():
+    """grade.py dates a file by its LAST commit, so a same-day append could
+    un-grade the first run's rows. Each run gets its own name. The expected
+    names are written out rather than derived from the function under test."""
+    from src.forward import PREDICTIONS_DIR, prediction_path
+
+    a = prediction_path(pd.Timestamp("2026-09-29 13:07:41", tz="UTC"))
+    b = prediction_path(pd.Timestamp("2026-09-29 14:07:02", tz="UTC"))
+    assert a == PREDICTIONS_DIR / "2026-09-29T1307Z.csv"
+    assert b == PREDICTIONS_DIR / "2026-09-29T1407Z.csv"
+
+
+def test_unpredicted_late_counts_only_fixtures_nobody_predicted():
+    """The feed retains played fixtures. Those an earlier run predicted are
+    expected; the ones nobody predicted are what a late start cost."""
+    from src.forward import unpredicted_late
+
+    feed = _fixtures(["2026-09-26 15:00", "2026-09-29 19:45", "2026-09-29 19:45",
+                      "2026-09-30 19:45"],
+                     ids=["old|predicted", "late|predicted", "late|missed", "future"])
+    got = unpredicted_late(feed, {"old|predicted", "late|predicted"},
+                           pd.Timestamp("2026-09-29 20:00"))
+    assert got["match_id"].tolist() == ["late|missed"]

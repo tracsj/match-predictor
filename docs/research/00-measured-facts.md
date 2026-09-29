@@ -383,6 +383,34 @@ matches, 17 → 18 divisions, where `download_all` alone gained nothing.
 was 2026-08-10 while the feed already listed 14–17 August. Grading is therefore
 always a few days behind prediction, by design rather than by fault.
 
+### GitHub starts the scheduled forecast hours late, and that is where most forward misses come from
+
+Measured 2026-09-29 with `PYTHONPATH=. uv run python scripts/forward_coverage_attribution.py`, on a corpus refreshed that day. Re-check before quoting: the delay is GitHub's and can change.
+
+**Start delay.** Every scheduled run, 2026-08-28 → 09-29, against the old cron (Tue 13:15 UTC, Fri 17:15 UTC):
+
+| slot | runs | delay |
+|---|---|---|
+| Tuesday | 5 | 3h59m – 5h22m |
+| Friday | 5 | 2h22m – 7h43m |
+
+Manual dispatches started within a minute. The workflow runs about 11 minutes once started.
+
+**Why each missed fixture was missed.** Between 2026-08-19 and 09-28, 134 of 1,102 fixtures in the 22 divisions were never predicted:
+
+| cause | fixtures | where |
+|---|---|---|
+| lateness: an on-time run would have caught it | **87** | Fri 19:xx and 20:xx (81), plus 5 Friday-19:xx fixtures on 09-25 and one on Tuesday |
+| failed run | 21 | 09-08, when every current-season file returned **HTTP 503**. The outage was transient, and the next run was clean |
+| absent from the file for its date | 15 | 11 are National League fixtures on the 2026-08-31 bank-holiday Monday, which the feed never listed. 3 are team-key mismatches in `2026-08-18.csv`: it holds `atl madrid`, `sheffield wed`, `bradford city` and `rayo vallecano`, while the corpus now keys `ath madrid`, `sheffield weds`, `bradford` and `vallecano`, so those predictions never join. 1 is a home/away swap: the file has `F1\|20260823\|paris sg\|rennes`, the result is `rennes\|paris sg` |
+| feed window | 11 | Fri 17:30/18:00 kickoffs, which the Tuesday feed does not reach and which fall before an on-time Friday run finishes. Also one Tuesday 13:00 |
+
+**This overturns part of the `src/grade.py` coverage comment.** It said no cron change could fix the Friday misses. That holds for the 17:30 and 18:00 kickoffs, the 11 in the feed-window row. It does not hold for the 81 at 19:00 and later: an on-time 18:15 UK run reaches those, and a late one does not.
+
+**Two gaps that were not bugs:** 09-22's "no upcoming fixtures" and 09-25's 36-fixture file (E2, E3, EC, SP2 only). The corpus has no fixtures in the other 18 divisions on 22–24 or 26–28 Sep, so this was an international break. Every fixture in the 22 divisions on 26–28 Sep was predicted.
+
+**The feed sends no `Last-Modified` header** (`curl -sI https://www.football-data.co.uk/fixtures.csv`, 2026-09-29), so the only way to learn when an upload lands is to record what each run saw. `src/forward.py` now prints it.
+
 ### football-data serves a SUBSTITUTE file for a division-season that does not exist
 
 Not documented anywhere, and it silently triples match counts if you trust filenames.

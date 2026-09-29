@@ -56,7 +56,7 @@ None of these is `@`-imported — an imported spoke is still always-loaded and s
 
 ## Verification that must keep passing
 
-The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — **348 tests** (2026-08-27).
+The harness self-tests are the reason any number here is trustworthy. `uv run pytest` — **352 tests** (2026-09-29).
 
 **All five skip silently when `data/processed/matches.parquet` is absent**, which is the default on a fresh runner, and pytest then reports green. `uv run python scripts/assert_selftests_ran.py` asserts the five checks below actually ran; the workflow calls it after the suite. A green build without that step means nothing.
 
@@ -87,13 +87,14 @@ src/
   eval/        devig (Shin), metrics (RPS/log-loss/ECE), split, betting, CLV
   scoreboard.py  experiments.py  tier2.py  phase6.py  h1.py  h3.py
   refresh.py   re-fetch the current season and rebuild the corpus
-  forward.py   predict upcoming fixtures, write predictions/YYYY-MM-DD.csv
+  forward.py   predict upcoming fixtures, write predictions/<UTC start>.csv, one per run
   grade.py     grade committed predictions, rewrite docs/FORWARD_LEDGER.md
 scripts/       assert_selftests_ran.py — the five self-tests must RUN, not skip
                h1_*.py, clv_null_calibration.py, forward_matched_null.py,
-               day_clustered_clv.py — H1's coverage probe, its post-hoc
-               controls, the forward ledger's odds-matching check, and the
-               day-clustered re-test of the two marginal CLV results. Each says
+               day_clustered_clv.py, forward_coverage_attribution.py — H1's
+               coverage probe, its post-hoc controls, the forward ledger's
+               odds-matching check, the day-clustered re-test of the two
+               marginal CLV results, and why each forward miss was missed. Each says
                in its docstring whether it is a control (no registry count) or
                an evaluation
 predictions/   committed forward predictions. NOT gitignored; the commit is the

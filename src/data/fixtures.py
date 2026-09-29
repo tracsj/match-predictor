@@ -49,7 +49,7 @@ from src.data.footballdata import (
 from src.features.horizon import UNPLAYED_COL
 
 __all__ = ["FIXTURES_URL", "download_fixtures", "load_fixtures", "build_fixtures",
-           "season_of", "uk_now_naive"]
+           "describe_fixtures", "season_of", "uk_now_naive"]
 
 FIXTURES_URL = f"{BASE}/fixtures.csv"
 FIXTURES_CSV = RAW_DIR / "fixtures.csv"
@@ -182,7 +182,7 @@ def build_fixtures(refresh: bool = True, write: bool = True,
     return df
 
 
-def _describe(fx: pd.DataFrame, label: str) -> None:
+def describe_fixtures(fx: pd.DataFrame, label: str) -> None:
     print(f"{label}: {len(fx)} fixtures across {fx['div'].nunique()} divisions")
     if not len(fx):
         return
@@ -209,6 +209,6 @@ if __name__ == "__main__":
         download_fixtures()
     print(f"UK now: {uk_now_naive():%Y-%m-%d %H:%M}")
     if args.all:
-        _describe(load_fixtures(now=pd.Timestamp("1900-01-01")), "whole window")
+        describe_fixtures(load_fixtures(now=pd.Timestamp("1900-01-01")), "whole window")
         print()
-    _describe(build_fixtures(refresh=False), "upcoming")
+    describe_fixtures(build_fixtures(refresh=False), "upcoming")

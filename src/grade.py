@@ -344,8 +344,14 @@ def build_report(verbose: bool = True) -> str:
     # UK. The earliest observed Friday kickoff is 17:30 UK, and a run takes ~20
     # minutes, so the Friday run CANNOT cover it -- it is only ever reachable
     # from Tuesday's snapshot, and whether that snapshot reaches Friday is not
-    # something one observation could establish. No cron change fixes this; the
-    # feed only has two states a week. So it is measured instead of assumed.
+    # something one observation could establish. So it is measured instead of
+    # assumed.
+    #
+    # Measured 2026-09-29 (scripts/forward_coverage_attribution.py): the Tuesday
+    # snapshot does NOT reach Friday, so 17:30/18:00 Friday kickoffs are lost to
+    # the feed. But 81 of the Fri 19:xx/20:xx misses were LATENESS -- GitHub
+    # started the Friday cron 2-7h late, after kickoff. Those a punctual run
+    # catches. See docs/research/00-measured-facts.md.
     covered_divs = sorted(graded["div"].dropna().unique())
     span_lo = pd.to_datetime(graded["kickoff"]).min()
     span_hi = pd.to_datetime(graded["kickoff"]).max()
@@ -372,7 +378,7 @@ def build_report(verbose: bool = True) -> str:
         w(f"- Predicted: **{int(sched['was_predicted'].sum()):,}**")
         w(f"- Missed: **{int((~sched['was_predicted']).sum()):,}**")
         w("")
-        w("Worst slots first. Friday early kickoffs are the known suspect.")
+        w("Worst slots first. `scripts/forward_coverage_attribution.py` says why each was missed.")
         w("")
         w("```")
         w(_fmt(by_slot.head(12)))
