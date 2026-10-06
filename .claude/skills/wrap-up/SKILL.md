@@ -33,6 +33,8 @@ Before we close this session:
 
 5. **Stale working-doc scan** — Run `find . -maxdepth 1 -name "*.md" | sort` and `ls docs/*.md`. Known-persistent (skip): `CLAUDE.md`, `README.md`, `PROGRAMME.md`, any `PREREG*.md` (the original `PREREGISTRATION.md` plus per-hypothesis ones like `PREREG_PHASE6_NULL.md` — all frozen records, never edited retroactively), `FORWARD_LEDGER.md` (machine-written by the forecast workflow — never edit it by hand), and any `*_RESULT.md`. For each other file, ask the user: delete, move to the right subfolder, or keep with an explicit note added to CLAUDE.md. Do not silently skip or auto-delete.
 
+   **Check the code too, not only the docs.** Where this session touched code, read its comments and docstrings against what it now does. A `betting.py` docstring advertising a Kelly simulation that never existed, or a `src/grade.py` comment saying *"No cron change fixes this"*, cannot fail a test, because each is a claim rather than a behaviour.
+
 6. **Next-session brief** — *the step whose absence is invisible until the next session opens cold.*
 
     Update the **"Where we are — read this first"** section at the top of `docs/PROGRAMME.md`: what was finished, what is next in order, and any open thread a fresh session would otherwise rediscover.

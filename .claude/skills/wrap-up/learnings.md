@@ -4,18 +4,10 @@
 
 ### 2026-09-29 — a second "claim about itself" case, and this one steered a month of reading
 
-The 08-27 entry below (claims rather than computations) recurred. A `src/grade.py` comment said *"No cron change fixes this"* about the Friday misses, and the PROGRAMME handoff repeated it. For a month, nobody measured it. When `scripts/forward_coverage_attribution.py` did, all 86 Friday 19:00/20:00 misses were lateness, which a cron change does fix. The claim was an inference from one mechanism (the 17:30 kickoff) generalised to a whole slot. The handoff's "cron has never fired" warning had also sat unanswered for a month, because no session opened between the schedule starting and the failure.
+The 08-27 pattern now in wrap-up SKILL.md step 5 (claims rather than computations) recurred. A `src/grade.py` comment said *"No cron change fixes this"* about the Friday misses, and the PROGRAMME handoff repeated it. For a month, nobody measured it. When `scripts/forward_coverage_attribution.py` did, all 86 Friday 19:00/20:00 misses were lateness, which a cron change does fix. The claim was an inference from one mechanism (the 17:30 kickoff) generalised to a whole slot. The handoff's "cron has never fired" warning had also sat unanswered for a month, because no session opened between the schedule starting and the failure.
 
 Second occurrence of the pattern. It may belong in `/housekeeping`: a check that the "Where we are" section's open checks are dated, and that any past their date gets flagged. Not proposed as a wrap-up step.
 
 <!-- 2026-08-27 (2nd session; step 3 argued nine things down, the hardest one flipped a sign) — pruned 2026-10-05 by /housekeeping: carried in wrap-up SKILL.md:18 (ask what the thing was searching for) and docs/PROGRAMME.md:173 (the measured_shortening_null reasoning). -->
 
-### 2026-08-27 (2nd session) — a fourth check belongs in step 5, and the session found it by accident
-
-The suite was green all evening and three real faults sat underneath it: a workflow that had never registered with GitHub Actions, a `clv_report` null the docs had corrected ten days earlier and the code had not, and a `betting.py` docstring advertising a Kelly simulation that has never existed. **Not one of them could fail a test**, because each was a claim rather than a behaviour.
-
-No new step proposed — step 9's staleness pass is the right home and has been widened to say "check the code too, not only the docs". Recorded here because the pattern is that **the things this repo gets wrong are increasingly claims about itself rather than computations**, and the wrap-up's test-suite step cannot reach any of them.
-
-*(Promoted this session and therefore not left here: the "step 3's real work is arguing a configuration DOWN" entry, which had a stated trigger of a third occurrence. The third occurrence arrived — eight controls against one real evaluation — so it is now in SKILL.md step 3, with the requirement that a null result enumerate what was considered rather than assert that nothing was.)*
-
-*(Deleted, having been superseded: the entry recording that the registry seed was wrong on first reconciliation. Its stated follow-up was "if a second reconciliation also finds the total understated, promote". Two reconciliations have since run and neither found an understatement — the count moved 47 → 48 exactly as the ruling predicted — so the concern did not recur and the entry is not worth carrying.)*
+<!-- 2026-08-27 (2nd session; a fourth check belongs in step 5) — pruned 2026-10-05 by /housekeeping: promoted into wrap-up SKILL.md step 5 (check the code's comments and docstrings too, not only the docs); recurred 2026-09-29. -->
