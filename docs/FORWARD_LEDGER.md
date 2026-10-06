@@ -30,27 +30,27 @@ the same workflow step that commits this ledger, and grades normally from the
 next run onward. Nothing needs fixing.
 
 ```
-                file  rows        committed_at       first_kickoff      status
-      2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00          ok
-      2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00          ok
-      2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00          ok
-      2026-08-29.csv   164 2026-08-29 02:12:11 2026-08-29 12:00:00          ok
-      2026-09-01.csv    48 2026-09-01 18:33:38 2026-09-01 19:45:00          ok
-      2026-09-04.csv   178 2026-09-04 20:52:58 2026-09-05 12:00:00          ok
-      2026-09-11.csv   169 2026-09-11 20:57:57 2026-09-12 12:00:00          ok
-      2026-09-15.csv    29 2026-09-15 18:54:32 2026-09-15 19:00:00          ok
-      2026-09-18.csv   177 2026-09-18 20:52:36 2026-09-19 12:00:00          ok
-      2026-09-25.csv    36 2026-09-25 21:42:08 2026-09-26 13:00:00          ok
-2026-09-29T2040Z.csv     2 2026-09-29 21:48:03 2026-09-30 19:45:00          ok
-2026-10-02T2047Z.csv    45                 NaT 2026-10-03 12:30:00 uncommitted
+                file  rows        committed_at       first_kickoff status
+      2026-08-18.csv     3 2026-08-18 15:09:29 2026-08-19 20:00:00     ok
+      2026-08-21.csv   165 2026-08-21 18:56:49 2026-08-21 19:00:00     ok
+      2026-08-25.csv     5 2026-08-25 15:15:44 2026-08-25 20:00:00     ok
+      2026-08-29.csv   164 2026-08-29 02:12:11 2026-08-29 12:00:00     ok
+      2026-09-01.csv    48 2026-09-01 18:33:38 2026-09-01 19:45:00     ok
+      2026-09-04.csv   178 2026-09-04 20:52:58 2026-09-05 12:00:00     ok
+      2026-09-11.csv   169 2026-09-11 20:57:57 2026-09-12 12:00:00     ok
+      2026-09-15.csv    29 2026-09-15 18:54:32 2026-09-15 19:00:00     ok
+      2026-09-18.csv   177 2026-09-18 20:52:36 2026-09-19 12:00:00     ok
+      2026-09-25.csv    36 2026-09-25 21:42:08 2026-09-26 13:00:00     ok
+2026-09-29T2040Z.csv     2 2026-09-29 21:48:03 2026-09-30 19:45:00     ok
+2026-10-02T2047Z.csv    45 2026-10-02 21:55:04 2026-10-03 12:30:00     ok
 ```
 
 ## Coverage
 
-- Predictions committed: **976**
-- Results landed: **970**
-- Awaiting result: **6**
-- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-09-30 19:45:00
+- Predictions committed: **1,021**
+- Results landed: **1,014**
+- Awaiting result: **7**
+- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-10-05 19:30:00
 
 ## Schedule coverage
 
@@ -59,15 +59,15 @@ kickoff slot, and whether a prediction exists for it. **A miss here is not a
 bad prediction — it is no prediction at all**, which is the failure mode that
 does not announce itself.
 
-- Fixtures in scope: **1,114** across 22 divisions
-- Predicted: **970**
-- Missed: **144**
+- Fixtures in scope: **1,160** across 22 divisions
+- Predicted: **1,014**
+- Missed: **146**
 
 Worst slots first. `scripts/forward_coverage_attribution.py` says why each was missed.
 
 ```
 weekday  hour  fixtures  predicted  missed
-    Fri    19        80         10      70
+    Fri    19        81         10      71
     Fri    20        19          3      16
     Tue    19        59         44      15
     Mon    15        11          0      11
@@ -76,18 +76,18 @@ weekday  hour  fixtures  predicted  missed
     Thu    20         8          4       4
     Wed    20         9          5       4
     Wed    19        20         17       3
-    Tue    18         1          0       1
+    Tue    17         1          0       1
     Wed    17         1          0       1
-    Tue    20         5          4       1
+    Tue    18         1          0       1
 ```
 
 ## Forecast quality
 
 ```
-                         model   n    rps  log_loss  brier    ece  accuracy
-             the net (forward) 970 0.2111    1.0226 0.6128 0.0210    0.4722
-market, exchange close (n=970) 970 0.2060    1.0058 0.6019 0.0296    0.4918
-          the net, same subset 970 0.2111    1.0226 0.6128 0.0210    0.4722
+                          model    n    rps  log_loss  brier    ece  accuracy
+              the net (forward) 1014 0.2108    1.0189 0.6103 0.0201    0.4763
+market, exchange close (n=1014) 1014 0.2057    1.0017 0.5990 0.0244    0.4961
+           the net, same subset 1014 0.2108    1.0189 0.6103 0.0201    0.4763
 ```
 
 The market band to sanity-check against is RPS 0.19–0.21. Outside it, suspect
@@ -111,16 +111,16 @@ overround line below is what makes the difference legible rather than surprising
 
 ```
     taken_at  n_bets  n_days  mean_ratio  pct_shortened  null_rate  excess_pp  two_prop_p  day_clustered_p
-exchange_pre     520      24      0.9806         0.3885     0.3398     4.8624      0.0345           0.0022
+exchange_pre     536      26      0.9804         0.3899     0.3372     5.2703      0.0197           0.0007
 ```
 
 **The mechanism, on these rows.** The pre-close book sums to
-1.0464 and the close to 1.0115, tightening in 88% of 956 rows.
+1.0468 and the close to 1.0115, tightening in 88% of 1000 rows.
 That is where the default lengthening comes from, and it is measured rather
 than assumed.
 
 **Treat this as an early number, not a finding.** The null is itself an
-estimate, from **2460** eligible cells, and a binomial against
+estimate, from **2571** eligible cells, and a binomial against
 it would treat it as exact. `two_prop_p` does not, and accounts for that.
 
 **`day_clustered_p` is the one to read, and it needs matchdays to read.**
@@ -142,10 +142,10 @@ clears the p < 0.01 this project requires before claiming an edge.
 
 ```
        price_set  n_eligible  n_bets     roi  roi_lo  roi_hi  hit_rate  avg_odds                                  note
-  exchange_close         970     614 -0.0195 -0.1291  0.1158    0.3094    3.3908  the sharpest price still in the feed
-      b365_close         970     414 -0.0716 -0.1902  0.0929    0.2923    3.3616 a book you could hold an account with
-market_max_close         970     546 -0.0963 -0.2872  0.0389    0.2875    3.3781                      optimistic bound
-market_avg_close         970     400 -0.1156 -0.2707  0.0677    0.2850    3.3344        softer benchmark, for coverage
+  exchange_close        1014     639 -0.0100 -0.1183  0.1204    0.3130    3.3933  the sharpest price still in the feed
+      b365_close        1014     436 -0.0742 -0.1869  0.0859    0.2913    3.3779 a book you could hold an account with
+market_max_close        1014     568 -0.0926 -0.2859  0.0388    0.2887    3.3891                      optimistic bound
+market_avg_close        1014     417 -0.1242 -0.2757  0.0423    0.2830    3.3422        softer benchmark, for coverage
 ```
 
 Rule: pre-registered: ev>=0.05, odds 1.5-5.0: bet the max-EV outcome when EV >= +0.050 and price in [1.5, 5.0] — fixed by `docs/PREREGISTRATION.md`.
