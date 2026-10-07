@@ -89,6 +89,13 @@ Wrap-up complete:
 
 If any step is ✗, state why before closing.
 
+Then end with two plain lines, outside the block, so Stephen never has to ask for state:
+
+- **pushed: yes / no**, naming for each repo touched what is unpushed and why (deploys on push, waiting on his go-ahead, no remote)
+- **safe to clear: yes / no**, and if no, what would be lost (uncommitted work, an unanswered question, a step still owed)
+
+Measure both rather than recalling them: `git status -sb` in every repo touched shows ahead and behind. *(His W41 experiment, picked 2026-10-05; the weekly review counts whether he still had to ask.)*
+
 ## Final step — Capture learnings
 
 If a wrap-up step behaved unexpectedly — skipped, fired incorrectly, or a pattern recurred — append a dated entry under `## Staging` in `learnings.md`. Do not promote or prune it here — `/housekeeping` owns that.
