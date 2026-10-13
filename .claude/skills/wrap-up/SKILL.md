@@ -3,7 +3,7 @@ name: wrap-up
 description: End-of-session capture. Summarises the session, appends skill learnings, commits this session's work. Consolidation (promotion, pruning, CLAUDE.md accuracy, permissions audit) belongs to /housekeeping, not here.
 ---
 
-Before starting, read [wrap-up learnings](learnings.md) and apply any guidance from the Staging section.
+Before starting, run `python3 ~/.claude/bin/staging-recent.py "$(git rev-parse --show-toplevel)/.claude/skills/wrap-up/learnings.md"` and apply what it prints: this skill's Staging entries from the last 14 days. Do not read the whole file. Older entries stay there for `/housekeeping` to promote or prune (Stephen's ruling, 2026-10-13).
 
 Before we close this session:
 
