@@ -5,6 +5,8 @@ description: End-of-session capture. Summarises the session, appends skill learn
 
 Before starting, run `python3 ~/.claude/bin/staging-recent.py "$(git rev-parse --show-toplevel)/.claude/skills/wrap-up/learnings.md"` and apply what it prints: this skill's Staging entries from the last 14 days. Do not read the whole file. Older entries stay there for `/housekeeping` to promote or prune (Stephen's ruling, 2026-10-13).
 
+**If wrap-up already ran this session,** cover only what happened since that run: no new summary, update the brief in place, commit what is new, and end with fresh *pushed* and *safe to clear* lines, since the first run's lines went stale when the work carried on. (Four occurrences: responsive 09-21, 09-26, 09-30; mark-campbell-site 09-16. Promoted 2026-10-13.)
+
 Before we close this session:
 
 1. **Session summary** — 3–5 bullets on what we did today.
