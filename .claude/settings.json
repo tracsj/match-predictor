@@ -38,7 +38,11 @@
       "Bash(uv run python -c:*)",
       "Bash(uv run python -:*)",
       "Edit(data/processed/**)",
-      "Edit(v1/**)"
+      "Edit(v1/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)"
     ]
   }
 }
