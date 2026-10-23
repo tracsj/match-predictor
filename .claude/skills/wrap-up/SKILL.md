@@ -93,6 +93,7 @@ If any step is ✗, state why before closing.
 
 Then end with two plain lines, outside the block, so Stephen never has to ask for state:
 
+- **Before any push,** run `git log --oneline origin/<branch>..HEAD`. If it carries commits this session did not write, name them and ask: a go-ahead covers this session's commits only.
 - **pushed: yes / no**, naming for each repo touched what is unpushed and why (deploys on push, waiting on his go-ahead, no remote)
 - **safe to clear: yes / no**, and if no, what would be lost (uncommitted work, an unanswered question, a step still owed)
 
