@@ -54,15 +54,16 @@ next run onward. Nothing needs fixing.
 2026-11-06T2133Z.csv   140 2026-11-06 21:40:15 2026-11-07 10:30:00          ok
 2026-11-13T2201Z.csv    50 2026-11-13 22:07:40 2026-11-14 12:30:00          ok
 2026-11-20T2244Z.csv   174 2026-11-20 22:53:14 2026-11-21 10:30:00          ok
-2026-11-24T2303Z.csv    12                 NaT 2026-11-25 18:00:00 uncommitted
+2026-11-24T2303Z.csv    12 2026-11-24 23:07:29 2026-11-25 18:00:00          ok
+2026-11-28T0005Z.csv   159                 NaT 2026-11-28 12:00:00 uncommitted
 ```
 
 ## Coverage
 
-- Predictions committed: **2,143**
-- Results landed: **2,124**
-- Awaiting result: **19**
-- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-11-23 20:00:00
+- Predictions committed: **2,155**
+- Results landed: **2,135**
+- Awaiting result: **20**
+- Divisions: **22**, kickoffs 2026-08-19 20:00:00 → 2026-11-26 20:00:00
 
 ## Schedule coverage
 
@@ -71,35 +72,35 @@ kickoff slot, and whether a prediction exists for it. **A miss here is not a
 bad prediction — it is no prediction at all**, which is the failure mode that
 does not announce itself.
 
-- Fixtures in scope: **2,413** across 22 divisions
-- Predicted: **2,124**
-- Missed: **289**
+- Fixtures in scope: **2,455** across 22 divisions
+- Predicted: **2,135**
+- Missed: **320**
 
 Worst slots first. `scripts/forward_coverage_attribution.py` says why each was missed.
 
 ```
 weekday  hour  fixtures  predicted  missed
     Fri    19       151         10     141
-    Tue    19       125         87      38
+    Tue    19       153         87      66
     Fri    20        38          3      35
     Fri    17        22          0      22
     Fri    18        12          0      12
     Mon    15        14          3      11
-    Tue    20        10          5       5
-    Wed    19        40         35       5
+    Tue    20        12          5       7
+    Wed    19        49         44       5
     Thu    20         9          5       4
-    Wed    20        13          9       4
+    Wed    20        14         10       4
+    Tue    18         3          0       3
     Tue    17         2          0       2
-    Tue    18         2          0       2
 ```
 
 ## Forecast quality
 
 ```
                           model    n    rps  log_loss  brier    ece  accuracy
-              the net (forward) 2124 0.2069    0.9914 0.5906 0.0277    0.5193
-market, exchange close (n=2124) 2124 0.2005    0.9701 0.5764 0.0219    0.5348
-           the net, same subset 2124 0.2069    0.9914 0.5906 0.0277    0.5193
+              the net (forward) 2135 0.2069    0.9908 0.5902 0.0280    0.5204
+market, exchange close (n=2135) 2135 0.2004    0.9695 0.5759 0.0226    0.5358
+           the net, same subset 2135 0.2069    0.9908 0.5902 0.0280    0.5204
 ```
 
 The market band to sanity-check against is RPS 0.19–0.21. Outside it, suspect
@@ -123,16 +124,16 @@ overround line below is what makes the difference legible rather than surprising
 
 ```
     taken_at  n_bets  n_days  mean_ratio  pct_shortened  null_rate  excess_pp  two_prop_p  day_clustered_p
-exchange_pre    1105      53      0.9829         0.3928     0.3431     4.9701      0.0017           0.0001
+exchange_pre    1110      54      0.9826         0.3910     0.3431     4.7857      0.0024           0.0002
 ```
 
 **The mechanism, on these rows.** The pre-close book sums to
-1.0541 and the close to 1.0104, tightening in 89% of 2106 rows.
+1.0539 and the close to 1.0104, tightening in 89% of 2117 rows.
 That is where the default lengthening comes from, and it is measured rather
 than assumed.
 
 **Treat this as an early number, not a finding.** The null is itself an
-estimate, from **5244** eligible cells, and a binomial against
+estimate, from **5272** eligible cells, and a binomial against
 it would treat it as exact. `two_prop_p` does not, and accounts for that.
 
 **`day_clustered_p` is the one to read, and it needs matchdays to read.**
@@ -154,10 +155,10 @@ clears the p < 0.01 this project requires before claiming an edge.
 
 ```
        price_set  n_eligible  n_bets     roi  roi_lo  roi_hi  hit_rate  avg_odds                                  note
-  exchange_close        2124    1318  0.0087 -0.0713  0.0848    0.3179    3.4265  the sharpest price still in the feed
-      b365_close        2124     874 -0.0898 -0.1826  0.0234    0.2860    3.4070 a book you could hold an account with
-market_max_close        2124    1157 -0.0513 -0.1622  0.0367    0.3016    3.4248                      optimistic bound
-market_avg_close        2124     839 -0.1418 -0.2436 -0.0270    0.2789    3.3584        softer benchmark, for coverage
+  exchange_close        2135    1325  0.0112 -0.0603  0.0887    0.3185    3.4268  the sharpest price still in the feed
+      b365_close        2135     879 -0.0836 -0.1817  0.0285    0.2878    3.4071 a book you could hold an account with
+market_max_close        2135    1162 -0.0468 -0.1495  0.0464    0.3029    3.4249                      optimistic bound
+market_avg_close        2135     843 -0.1377 -0.2468 -0.0273    0.2800    3.3587        softer benchmark, for coverage
 ```
 
 Rule: pre-registered: ev>=0.05, odds 1.5-5.0: bet the max-EV outcome when EV >= +0.050 and price in [1.5, 5.0] — fixed by `docs/PREREGISTRATION.md`.
